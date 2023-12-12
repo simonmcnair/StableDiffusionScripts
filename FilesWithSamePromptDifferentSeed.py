@@ -22,8 +22,8 @@ def write_to_log(log_file, message):
 
 
 # Root directory to start the recursive search
-#root_directory = 'C:/Users/Simon/Downloads/stable-diffusion/consolidated/Sort/'
-root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/'
+root_directory = 'C:/Users/Simon/Downloads/stable-diffusion/consolidated/Sort/'
+#root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/'
 log_file = root_directory + "my_log.txt"
 
 # Create a dictionary to store file hashes and corresponding folders
@@ -143,8 +143,8 @@ if writecsv == True:
                 csv_writer.writerow([content_hash, count, filename, full_path])
 
 movefiles = True
-moveiffilesover = 3
-renamefiles = False
+moveiffilesover = 1
+#renamefiles = False
 for hash, files in hash_to_files.items():
  
             if movefiles == True:
@@ -157,8 +157,9 @@ for hash, files in hash_to_files.items():
                         new_file_path = os.path.join( folder_name, os.path.basename(file_path))
                             
                         
-                        if hash in str(os.path.basename(file_path)) and hash in str(os.path.dirname(file_path)):
-                            print("Filename " +str(files) + " and directory already contain hash " + hash)
+                        if hash in str(os.path.dirname(file_path)):
+                        #if hash in str(os.path.basename(file_path)) and hash in str(os.path.dirname(file_path)):
+                            print("Filename " +str(files) + " already in a directory containing the hash " + hash)
                             continue
                         else:
                             if os.path.normpath(file_path) == os.path.normpath(new_file_path):
@@ -167,17 +168,17 @@ for hash, files in hash_to_files.items():
                                 os.makedirs(folder_name, exist_ok=True)
                                 os.rename(file_path, new_file_path)
                                 print(f"Moved: {file_path} to {new_file_path}")
-            elif renamefiles == True:
-                for file_path in files:
-                    if hash in str(file_path):
-                        print("Filename " +str(files) + "already contains hash " + hash)
-                        continue                    
-                    new_file_path = os.path.join( os.path.dirname(file_path), hash + '_' + os.path.basename(file_path))
-                    if file_path != new_file_path:
-                        try:
-                            os.rename(file_path, new_file_path)
-                        except Exception as e:
-                            print(str(e))
+            #elif renamefiles == True:
+            #    for file_path in files:
+            #        if hash in str(file_path):
+            #            print("Filename " +str(files) + "already contains hash " + hash)
+            #            continue                    
+            #        new_file_path = os.path.join( os.path.dirname(file_path), hash + '_' + os.path.basename(file_path))
+            #        if file_path != new_file_path:
+            #            try:
+            #                os.rename(file_path, new_file_path)
+            #            except Exception as e:
+            #                print(str(e))
 
 
 print("Files have been organized into folders.")
