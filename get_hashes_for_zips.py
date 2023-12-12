@@ -1,39 +1,44 @@
+import os
 import csv
-import glob
-import png
-from collections import Counter
+from PIL import Image
 
-# Define the keys that contain comma-separated values
-array_keys = ['prompt', 'negative_prompt']
+# create the CSV files
+overview_file = open("overview.csv", "w", newline="")
+overview_writer = csv.writer(overview_file)
+overview_writer.writerow(["filename", "metadata"])
 
-# Initialize counters for each array key
-array_counters = {key: Counter() for key in array_keys}
+prompt_file = open("prompt.csv", "w", newline="")
+prompt_writer = csv.writer(prompt_file)
+prompt_writer.writerow(["tag:value", "count"])
 
-# Loop over each PNG file in the working directory
-for filename in glob.glob('*.png'):
-    with open(filename, 'rb') as f:
-        reader = png.Reader(file=f)
-        metadata = {}
-        for chunk in reader.chunks():
-            if chunk[0] == b'tEXt':
-                key, value = chunk[1].decode('utf-8').split('\0')
-                if key in array_keys:
-                    metadata[key] = value.split(',')
-                    # Increment the counters for each value in the array
-                    array_counters[key].update(metadata[key])
-                else:
-                    metadata[key] = value
+negative_prompt_file = open("negative_prompt.csv", "w", newline="")
+negative_prompt_writer = csv.writer(negative_prompt_file)
+negative_prompt_writer.writerow(["tag:value", "count"])
 
-    # Write the metadata to a CSV file
-    with open(f'{filename}.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        for key, value in metadata.items():
-            if key not in array_keys:
-                writer.writerow([key, value])
-
-# Write the final counts to CSV files
-for key, counter in array_counters.items():
-    with open(f'{key}.csv', 'w', newline='') as countfile:
-        countwriter = csv.writer(countfile)
-        for item, count in counter.items():
-            countwriter.writerow([item, count])
+# loop through all PNG files in the current directory
+for filename in os.listdir("."):
+    if filename.endswith(".png"):
+        # open the PNG file and extract its metadata
+        img = Image.open(filename)
+        metadata = img.info
+        
+        # write the metadata to the overview CSV file
+        overview_writer.writerow([filename, metadata])
+        
+        # process the parameters and negative_prompt tags
+        if "parameters" in metadata:
+            parameters = metadata["parameters"].replace("\n", "").replace("\r", "")
+            parameters_dict = dict(item.split(":") for item in parameters.split(", "))
+            for tag_value, count in sorted(parameters_dict.items(), key=lambda x: int(x[1]), reverse=True):
+                prompt_writer.writerow([tag_value, count])
+        
+        if "negative_prompt" in metadata:
+            negative_prompt = metadata["negative_prompt"].replace("\n", "").replace("\r", "")
+            negative_prompt_dict = dict(item.split(":") for item in negative_prompt.split(", "))
+            for tag_value, count in sorted(negative_prompt_dict.items(), key=lambda x: int(x[1]), reverse=True):
+                negative_prompt_writer.writerow([tag_value, count])
+                
+# close the CSV files
+overview_file.close()
+prompt_file.close()
+negative_prompt_file.close()
