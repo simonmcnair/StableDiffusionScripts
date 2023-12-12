@@ -27,6 +27,7 @@ def getseed(mystr):
     except:
         return None
     return res
+    
 def findtags(inputstring):
     inputstring = inputstring.replace("\r", "")
     inputstring = inputstring.replace("\n", "")
@@ -48,9 +49,53 @@ def get_sanitized_download_time(filepath):
     # Return the sanitized datetime string
     return sanitized_dt_string
 
+
+def move_to_subfolder(path, subfolder):
+    # Check if the path is a directory or a file
+
+    last_folder = os.path.basename(os.path.dirname(path))
+
+    if subfolder in last_folder:
+        print(path + " directory tree already contains " + subfolder)
+        return
+
+    if os.path.isdir(path):
+        # Create the subfolder if it doesn't exist
+        subfolder_path = os.path.join(path, subfolder)
+        if not os.path.exists(subfolder_path):
+            os.makedirs(subfolder_path)
+
+        # Move all files in the directory to the subfolder
+        for file in os.listdir(path):
+            if os.path.isfile(os.path.join(path, file)):
+                base_name, ext = os.path.splitext(file)
+                dest_file = os.path.join(subfolder_path, file)
+                count = 1
+                while os.path.exists(dest_file):
+                    new_name = f"{base_name}_{count}{ext}"
+                    dest_file = os.path.join(subfolder_path, new_name)
+                    count += 1
+                shutil.move(os.path.join(path, file), dest_file)
+
+    elif os.path.isfile(path):
+        # Create the subfolder if it doesn't exist
+        subfolder_path = os.path.join(os.path.dirname(path), subfolder)
+        if not os.path.exists(subfolder_path):
+            os.makedirs(subfolder_path)
+
+        # Move the file to the subfolder
+        base_name, ext = os.path.splitext(os.path.basename(path))
+        dest_file = os.path.join(subfolder_path, os.path.basename(path))
+        count = 1
+        while os.path.exists(dest_file):
+            new_name = f"{base_name}_{count}{ext}"
+            dest_file = os.path.join(subfolder_path, new_name)
+            count += 1
+        shutil.move(path, dest_file)
+
+
 path = cwd = os.getcwd()
-#path = "c:\\users\\simon\\Downloads\\stable-diffusion\\consolidated\\Sort"
-path = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/'
+path = "c:\\users\\simon\\Downloads\\stable-diffusion\\consolidated\\Sort"
 #for filename in os.listdir("."):
 for root, dirs, files in os.walk(path):
     for filename in files:
@@ -60,11 +105,6 @@ for root, dirs, files in os.walk(path):
         
             badfile = False
             hasparameters = False
-            parameter = ""
-            model = ""
-            seed = ""
-            Loras = ""
-            new_filename = ""
 
             if filename.endswith(".png"):
                 with Image.open(item_path) as img:
@@ -72,7 +112,6 @@ for root, dirs, files in os.walk(path):
                         parameter = img.info.get("parameters")
                         if parameter is not None:
                             print(filename + " has metadata.")
-                            hasparameters = True
                         else:
                             print("PNG with no metadata")
                             badfile = True
@@ -84,7 +123,16 @@ for root, dirs, files in os.walk(path):
                 print("Ignoring unsupported filetype: " + filename)
                 continue
 
-            if hasparameters==True:
+            if badfile==True:
+                print(filename + " has no metadata.  Moving to nometa subdirectory")
+                move_to_subfolder(item_path,"nometa")
+            else:
+
+                model = ""
+                seed = ""
+                Loras = ""
+                new_filename = ""
+
                 model = getmodel(parameter)
                 seed = getseed(parameter)
 
@@ -129,7 +177,6 @@ for root, dirs, files in os.walk(path):
 
                 print(new_item_path)
 
-
                 if item_path not in new_item_path:
                     try:
                         shutil.move(item_path, new_item_path)
@@ -137,13 +184,7 @@ for root, dirs, files in os.walk(path):
                         print(str(e))
                 else:
                     print("doesn't need moving.  Src and dest are the same: " + item_path + ' ' + new_item_path)
-            
-            else:
-                if 'nometa' not in item_path:
-                    print("should this be in this folder ?")
-                else:
-                    print("no parameters")
 
 
-
-
+                print(new_item_path + " has metadata.  Moving to meta subdirectory")
+                move_to_subfolder(new_item_path,"meta")
