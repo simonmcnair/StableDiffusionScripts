@@ -24,7 +24,10 @@ for filename in os.listdir('.'):
                             my_list = value.split('Negative prompt: ')
                             positive = my_list[0].split(",")
                             positive = [x.strip() for x in positive]
-                
+                            dict = {'positive': my_list[0].split(',')}
+
+                            dict += {'negative': my_list[1].split(',')}
+
                             remainder = my_list[1].split(",")
                             remainder = [x.strip() for x in remainder]
 
@@ -33,32 +36,26 @@ for filename in os.listdir('.'):
                             remainder = value.split(",")
                             #todo no remainder prompt
 
-                    steps=[]
-                    steps += [x for x in remainder if "Steps:" in x]
+                    Extra=[]
+                    Extra += [x for x in remainder if "Steps:" in x]
                     remainder = [x for x in remainder if "Steps:" not in x]
                     
-                    sampler=[]
-                    sampler += [x for x in remainder if "Sampler:" in x]
+                    Extra += [x for x in remainder if "Sampler:" in x]
                     remainder = [x for x in remainder if "Sampler:" not in x]
 
-                    CFGScale=[]
-                    CFGScale += [x for x in remainder if "CFG scale:" in x]
+                    Extra += [x for x in remainder if "CFG scale:" in x]
                     remainder = [x for x in remainder if "CFG scale:" not in x]
 
-                    #Seed = [x for x in remainder if "Seed:" in x]
-                    Seed = []
-                    Seed += [x for x in remainder if "Seed:" in x]
+                    Extra += [x for x in remainder if "Seed:" in x]
                     remainder = [x for x in remainder if "Seed:" not in x]
 
-                    Size=[]
-                    Size += [x for x in remainder if "Size:" in x]
+                    Extra += [x for x in remainder if "Size:" in x]
                     remainder = [x for x in remainder if "Size:" not in x]
 
-                    ModelHash=[]
-                    ModelHash += [x for x in remainder if "Model hash:" in x]
+                    Extra += [x for x in remainder if "Model hash:" in x]
                     remainder = [x for x in remainder if "Model hash:" not in x]
 
-                    Model= [x for x in remainder if "Model:" in x]
+                    Extra += [x for x in remainder if "Model:" in x]
                     remainder = [x for x in remainder if "Model:" not in x]
 
                     if onlypositive == True:
