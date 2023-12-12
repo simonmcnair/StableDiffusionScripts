@@ -1,6 +1,8 @@
 import os
 import shutil
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
+
 import re
 from datetime import datetime
 
@@ -25,6 +27,14 @@ def getseed(mystr):
     except:
         return None
     return res
+def findtags(inputstring):
+    inputstring = inputstring.replace("\r", "")
+    inputstring = inputstring.replace("\n", "")
+    inputstring = [substring.strip() for substring in inputstring.split(',')]
+
+    
+    print(inputstring)
+    return
 
 def get_sanitized_download_time(filepath):
     # Get the modification time of the file
@@ -39,7 +49,8 @@ def get_sanitized_download_time(filepath):
     return sanitized_dt_string
 
 path = cwd = os.getcwd()
-path = "c:\\users\\simon\\Downloads\\stable-diffusion\\consolidated"
+#path = "c:\\users\\simon\\Downloads\\stable-diffusion\\consolidated\\Sort"
+path = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/'
 #for filename in os.listdir("."):
 for root, dirs, files in os.walk(path):
     for filename in files:
@@ -49,9 +60,11 @@ for root, dirs, files in os.walk(path):
         
             badfile = False
             hasparameters = False
-            parameter = None
-            model = None
-            seed = None
+            parameter = ""
+            model = ""
+            seed = ""
+            Loras = ""
+            new_filename = ""
 
             if filename.endswith(".png"):
                 with Image.open(item_path) as img:
@@ -73,68 +86,58 @@ for root, dirs, files in os.walk(path):
 
             if hasparameters==True:
                 model = getmodel(parameter)
-
                 seed = getseed(parameter)
-                datetimemod = get_sanitized_download_time(item_path)
 
-                if '<lora:' in parameter:
+                if model is not None:
+                    new_filename = model + '_'
+                else:
+                    new_filename = "nomodel_"
+
+                if seed is not None:
+                    new_filename = new_filename + seed  + '_'
+                else:
+                    new_filename = new_filename + "noseed_"
+
+
+                new_filename = new_filename + '_' + get_sanitized_download_time(item_path) + '_'
+                # os.path.splitext(filename)[1]
+
+                if 'lora:' in parameter:
                     # Use a regular expression to find all words between lora: and :?>
-                    matches = re.findall(r'lora:(.*?):', parameter)
-                    Loras = '_'.join(matches)
 
-
-                    if model is not None and seed is not None:
-                        new_filename = model + '_' + seed + '_' + datetimemod + '_Loras_' + Loras + os.path.splitext(filename)[1]
-                        new_item_path = os.path.join(root, new_filename)
-
-                        print(new_item_path)
-
-                        try:
-                            if not os.path.samefile(item_path, new_item_path):
-                                    shutil.move(item_path, new_item_path)
-                        except Exception as e:
-                            print(str(e))
-                    elif seed is not None:
-                        new_filename = seed + '_' + datetimemod + '_Loras_' + Loras + os.path.splitext(filename)[1]
-                        new_item_path = os.path.join(root, new_filename)
-
-                        print(new_item_path)
-
-                        try:
-                            if not os.path.samefile(item_path, new_item_path):
-                                    shutil.move(item_path, new_item_path)
-                        except Exception as e:
-                            print(str(e))
-
+                    if "Negative prompt" in parameter:
+                        parts = parameter.split("Negative prompt", 1)
                     else:
-                        print("seed or model is blank.  Skipping")
+                        parts = re.split(r'[\r\n]+', parameter)
+                        #parts = re.split(r'[\r\n]Steps', parameter)
+
+                    if len(parts) > 1:
+                        matches = re.findall(r'lora:(.*?):', parts[0])
+                        Loras = '_'.join(matches)
+
+                        tags = findtags(parts[0])
+                    else:
+                        print("Prompt me")
+
+
+                    new_filename = new_filename + 'Loras_' + Loras + '_'
                 else:
                     print("uses no Loras")
 
-                    if model is not None and seed is not None:
-                        new_filename = model + '_' + seed + '_' + datetimemod + os.path.splitext(filename)[1]
-                        new_item_path = os.path.join(root, new_filename)
+                new_filename = new_filename + os.path.splitext(filename)[1]
+                new_item_path = os.path.join(root, new_filename)
 
-                        print(new_item_path)
+                print(new_item_path)
 
-                        try:
-                            if not os.path.samefile(item_path, new_item_path):
-                                    shutil.move(item_path, new_item_path)
-                        except Exception as e:
-                            print(str(e))
-                    elif seed is not None:
-                        new_filename = seed + '_' + datetimemod + '_Loras_' + Loras + os.path.splitext(filename)[1]
-                        new_item_path = os.path.join(root, new_filename)
 
-                        print(new_item_path)
-
-                        try:
-                            if not os.path.samefile(item_path, new_item_path):
-                                    shutil.move(item_path, new_item_path)
-                        except Exception as e:
-                            print(str(e))
-                    else:
-                        print("Parameters but no seed or model")
+                if item_path not in new_item_path:
+                    try:
+                        shutil.move(item_path, new_item_path)
+                    except Exception as e:
+                        print(str(e))
+                else:
+                    print("doesn't need moving.  Src and dest are the same: " + item_path + ' ' + new_item_path)
+            
             else:
                 if 'nometa' not in item_path:
                     print("should this be in this folder ?")
