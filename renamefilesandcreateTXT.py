@@ -62,12 +62,14 @@ for filename in os.listdir("."):
 
                 test = parameter.split(",")
                 result = extract_text_after2(test,"Model")
-                if None is None:
+                if result is None:
                     print("No Model specified in " + filename)
+                    result = "No_model_specified_"
                 else:
                     output_filename = result + "_" + os.path.splitext(filename)[0] + ".txt"
-                    with open(output_filename, "w", encoding="utf-8") as output_file:
-                        output_file.write(parameter)
+                    
+                with open(output_filename, "w", encoding="utf-8") as output_file:
+                    output_file.write(parameter)
                         #output_file.write(parameter)
             else:
                 badfile = True
@@ -76,8 +78,10 @@ for filename in os.listdir("."):
         print(filename + " has no metadata.  Moving")
         move_to_subfolder(filename,"nometa")
     if badfile==False:
-        if result is not None:
-            print(filename + " metadataextracted.  Moving")
-            shutil.move(filename, result+ "_" + filename)
+            print(filename + " metadata extracted.  Moving")
+            try:
+                shutil.move(filename, result+ "_" + filename)
+            except Exception as e:
+                print("File move failed with error " + e)
 
        
