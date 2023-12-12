@@ -1,62 +1,98 @@
-from PIL import Image
 import os
 import csv
+from PIL import Image
 
-# Initialize the counters for the prompt and negative_prompt tags
-prompt_counts = {}
-negative_prompt_counts = {}
+positive_prompts = []
+remainder_prompts = []
+occurrences = {}
 
-# Open the output CSV files for writing
-with open("overview.csv", "w", newline="", encoding="utf-8") as overview_file, \
-     open("prompt.csv", "w", newline="", encoding="utf-8") as prompt_file, \
-     open("negative_prompt.csv", "w", newline="", encoding="utf-8") as negative_prompt_file:
+# Loop through all PNG files in the current working directory
+for filename in os.listdir('.'):
+    if os.path.isfile(filename):
 
-    # Create CSV writers for each file
-    overview_writer = csv.writer(overview_file)
-    prompt_writer = csv.writer(prompt_file)
-    negative_prompt_writer = csv.writer(negative_prompt_file)
+        if filename.endswith('.png'):
+            with Image.open(filename) as im:
+                # Extract the metadata from the PNG file
+                metadata = im.info
+                #metadata_lines = metadata.splitlines()
+                if 'parameters' in metadata:
+                    for key, value in metadata.items():
+                        #print(f'The value for key {key} is {value}')
+                        value = value.replace("\n", "").replace("\r", "")
+                        if 'Negative prompt: ' in value:
+                            onlypositive = False
+                            my_list = value.split('Negative prompt: ')
+                            positive = my_list[0].split(",")
+                            positive = [x.strip() for x in positive]
+                
+                            remainder = my_list[1].split(",")
+                            remainder = [x.strip() for x in remainder]
 
-    # Write the headers for the CSV files
-    overview_writer.writerow(["Filename", "Metadata"])
-    prompt_writer.writerow(["Tag", "Value", "Count"])
-    negative_prompt_writer.writerow(["Tag", "Value", "Count"])
+                        else:
+                            onlypositive = True
+                            remainder = value.split(",")
+                            #todo no remainder prompt
 
-    # Traverse the PNG files in the current working directory
-    for filename in os.listdir("."):
-        if filename.endswith(".png"):
-            # Open the PNG file and extract the metadata
-            with Image.open(filename) as img:
-                metadata = img.info
+                    steps=[]
+                    steps += [x for x in remainder if "Steps:" in x]
+                    remainder = [x for x in remainder if "Steps:" not in x]
+                    
+                    sampler=[]
+                    sampler += [x for x in remainder if "Sampler:" in x]
+                    remainder = [x for x in remainder if "Sampler:" not in x]
 
-            # Write the metadata to the overview CSV file
-            overview_writer.writerow([filename, metadata])
+                    CFGScale=[]
+                    CFGScale += [x for x in remainder if "CFG scale:" in x]
+                    remainder = [x for x in remainder if "CFG scale:" not in x]
 
-            # Process the parameters tag in the metadata
-            if "parameters" in metadata:
-                parameters = metadata["parameters"].replace("\n", "").replace("\r", "")
-                parameter_dict = {}
-                for param in parameters.split(","):
-                    if ":" in param:
-                        key, value = param.split(":", 1)
-                        parameter_dict[key.strip()] = value.strip()
-                for key, value in parameter_dict.items():
-                    # Update the prompt counts
-                    prompt_counts.setdefault(key, {}).setdefault(value, 0)
-                    prompt_counts[key][value] += 1
-                    # Write the prompt tag counts to the CSV file
-                    prompt_writer.writerow([key, value, prompt_counts[key][value]])
+                    #Seed = [x for x in remainder if "Seed:" in x]
+                    Seed = []
+                    Seed += [x for x in remainder if "Seed:" in x]
+                    remainder = [x for x in remainder if "Seed:" not in x]
 
-            # Process the negative_prompt tag in the metadata
-            if "negative_prompt" in metadata:
-                negative_prompt = metadata["negative_prompt"].replace("\n", "").replace("\r", "")
-                negative_prompt_dict = {}
-                for param in negative_prompt.split(","):
-                    if ":" in param:
-                        key, value = param.split(":", 1)
-                        negative_prompt_dict[key.strip()] = value.strip()
-                for key, value in negative_prompt_dict.items():
-                    # Update the negative_prompt counts
-                    negative_prompt_counts.setdefault(key, {}).setdefault(value, 0)
-                    negative_prompt_counts[key][value] += 1
-                    # Write the negative_prompt tag counts to the CSV file
-                    negative_prompt_writer.writerow([key, value, negative_prompt_counts[key][value]])
+                    Size=[]
+                    Size += [x for x in remainder if "Size:" in x]
+                    remainder = [x for x in remainder if "Size:" not in x]
+
+                    ModelHash=[]
+                    ModelHash += [x for x in remainder if "Model hash:" in x]
+                    remainder = [x for x in remainder if "Model hash:" not in x]
+
+                    Model= [x for x in remainder if "Model:" in x]
+                    remainder = [x for x in remainder if "Model:" not in x]
+
+                    if onlypositive == True:
+                        positive = remainder
+
+                        #print ("Positive: " , end='')
+                        #print(','.join(positive)) 
+                        #print( "Seed: " + Seed)
+                    else:
+                        negative = remainder
+                        #print ("Positive: " , end='')
+                        #print(','.join(positive), ) 
+                        #print ("Negative: " , end='')
+                        #print(','.join(negative)) 
+                        #print( "Seed: " + Seed)
+                else:
+                    print(filename + " is not a Stable diffusion file")
+        else:
+            print(filename + " is not a png")
+                    # Extract the values from the "parameters" tag and add them to the positive prompts list
+
+
+
+
+
+count_dict = {}
+for item in lst:
+    if item in count_dict:
+        count_dict[item] += 1
+    else:
+        count_dict[item] = 1
+
+with open("output.csv", "w", newline="") as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(["item", "count"])
+    for item, count in count_dict.items():
+        writer.writerow([item, count])
