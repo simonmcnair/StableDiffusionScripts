@@ -1,95 +1,58 @@
 import os
-import csv
 from PIL import Image
+import csv
 
-positive_prompts = []
-remainder_prompts = []
-occurrences = {}
+def extract_metadata(png_path):
+    try:
+        with Image.open(png_path) as im:
+            metadata = im.info
+            if 'parameters' in metadata:
+                params = metadata['parameters']
+                positive_prompts = [x.strip() for x in params.split(',') if ':' in x]
+                negative_prompts = []
+                if 'Negative prompt:' in params:
+                    negative_prompts = [x.strip() for x in params.split('Negative prompt:')[1].split(',') if ':' in x]
 
-# Loop through all PNG files in the current working directory
-for filename in os.listdir('.'):
-    if os.path.isfile(filename):
+                steps = metadata.get('Steps', '')
+                sampler = metadata.get('Sampler', '')
+                cfg_scale = metadata.get('CFG scale', '')
+                seed = metadata.get('Seed', '')
+                size = metadata.get('Size', '')
+                model_hash = metadata.get('Model hash', '')
+                model = metadata.get('Model', '')
 
-        if filename.endswith('.png'):
-            with Image.open(filename) as im:
-                # Extract the metadata from the PNG file
-                metadata = im.info
-                #metadata_lines = metadata.splitlines()
-                if 'parameters' in metadata:
-                    for key, value in metadata.items():
-                        #print(f'The value for key {key} is {value}')
-                        value = value.replace("\n", "").replace("\r", "")
-                        if 'Negative prompt: ' in value:
-                            onlypositive = False
-                            my_list = value.split('Negative prompt: ')
-                            positive = my_list[0].split(",")
-                            positive = [x.strip() for x in positive]
-                            dict = {'positive': my_list[0].split(',')}
+                data = []
+                for prompt in positive_prompts:
+                    data.append((prompt, 'positive', 1))
+                for prompt in negative_prompts:
+                    data.append((prompt, 'negative', 1))
 
-                            dict += {'negative': my_list[1].split(',')}
+                data.append(('steps', steps, 1))
+                data.append(('Sampler', sampler, 1))
+                data.append(('CFG scale', cfg_scale, 1))
+                data.append(('Seed', seed, 1))
+                data.append(('Size', size, 1))
+                data.append(('Model hash', model_hash, 1))
+                data.append(('Model', model, 1))
 
-                            remainder = my_list[1].split(",")
-                            remainder = [x.strip() for x in remainder]
-
-                        else:
-                            onlypositive = True
-                            remainder = value.split(",")
-                            #todo no remainder prompt
-
-                    Extra=[]
-                    Extra += [x for x in remainder if "Steps:" in x]
-                    remainder = [x for x in remainder if "Steps:" not in x]
-                    
-                    Extra += [x for x in remainder if "Sampler:" in x]
-                    remainder = [x for x in remainder if "Sampler:" not in x]
-
-                    Extra += [x for x in remainder if "CFG scale:" in x]
-                    remainder = [x for x in remainder if "CFG scale:" not in x]
-
-                    Extra += [x for x in remainder if "Seed:" in x]
-                    remainder = [x for x in remainder if "Seed:" not in x]
-
-                    Extra += [x for x in remainder if "Size:" in x]
-                    remainder = [x for x in remainder if "Size:" not in x]
-
-                    Extra += [x for x in remainder if "Model hash:" in x]
-                    remainder = [x for x in remainder if "Model hash:" not in x]
-
-                    Extra += [x for x in remainder if "Model:" in x]
-                    remainder = [x for x in remainder if "Model:" not in x]
-
-                    if onlypositive == True:
-                        positive = remainder
-
-                        #print ("Positive: " , end='')
-                        #print(','.join(positive)) 
-                        #print( "Seed: " + Seed)
-                    else:
-                        negative = remainder
-                        #print ("Positive: " , end='')
-                        #print(','.join(positive), ) 
-                        #print ("Negative: " , end='')
-                        #print(','.join(negative)) 
-                        #print( "Seed: " + Seed)
-                else:
-                    print(filename + " is not a Stable diffusion file")
-        else:
-            print(filename + " is not a png")
-                    # Extract the values from the "parameters" tag and add them to the positive prompts list
+                return data
+    except Exception as e:
+        print(f"Error processing {png_path}: {e}")
+    return []
 
 
+if __name__ == '__main__':
+    png_files = [f for f in os.listdir('.') if f.endswith('.png')]
 
+    prompt_data = []
+    for png_file in png_files:
+        data = extract_metadata(png_file)
+        prompt_data.extend(data)
 
+    prompt_data = sorted(prompt_data, key=lambda x: x[2], reverse=True)
 
-count_dict = {}
-for item in lst:
-    if item in count_dict:
-        count_dict[item] += 1
-    else:
-        count_dict[item] = 1
-
-with open("output.csv", "w", newline="") as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(["item", "count"])
-    for item, count in count_dict.items():
-        writer.writerow([item, count])
+    with open('prompt.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['prompt', 'type', 'count'])
+        for prompt, prompt_type, count in prompt_data:
+            writer.writerow([prompt, prompt_type, count])
