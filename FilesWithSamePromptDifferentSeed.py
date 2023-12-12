@@ -3,10 +3,56 @@ import re
 import hashlib
 from datetime import datetime
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 #import uuid
 import csv
 from collections import defaultdict
 from collections import Counter
+import shutil
+
+def extract_text_after2(list_obj, text):
+    for element in list_obj:
+        if element.strip().lower().startswith(text.lower() + ":"):
+            return element.split(":")[-1].strip()
+    return None
+
+def getmodel(mystr):
+    test = parameter.split(",")
+    try:
+        res = extract_text_after2(test,"Model")
+    except:
+        return None
+    return res
+
+def getseed(mystr):
+    test = parameter.split(",")
+    try:
+        res = extract_text_after2(test,"Seed")
+    except:
+        return None
+    return res
+    
+def findtags(inputstring):
+    inputstring = inputstring.replace("\r", "")
+    inputstring = inputstring.replace("\n", "")
+    inputstring = [substring.strip() for substring in inputstring.split(',')]
+
+    
+    print(inputstring)
+    return
+
+def get_sanitized_download_time(filepath):
+    # Get the modification time of the file
+    mtime = os.path.getmtime(filepath)
+    # Convert the modification time to a datetime object
+    dt = datetime.fromtimestamp(mtime)
+    # Format the datetime as a string in the format YYYY-MM-DD_HH-MM-SS
+    dt_string = dt.strftime("%Y-%m-%d_%H-%M-%S")
+    # Replace any spaces or colons with underscores
+    sanitized_dt_string = dt_string.replace(" ", "_").replace(":", "_")
+    # Return the sanitized datetime string
+    return sanitized_dt_string
+
 
 def extract_values_from_parameter(parameter):
     # Use regular expressions to extract values from the parameter section
@@ -20,11 +66,54 @@ def write_to_log(log_file, message):
     except Exception as e:
         print(f"Error writing to the log file: {e}")
 
+def move_to_subfolder(path, subfolder):
+    # Check if the path is a directory or a file
+
+    last_folder = os.path.basename(os.path.dirname(path))
+
+    if subfolder in last_folder:
+        print(path + " directory tree already contains " + subfolder)
+        return
+
+    if os.path.isdir(path):
+        # Create the subfolder if it doesn't exist
+        subfolder_path = os.path.join(path, subfolder)
+        if not os.path.exists(subfolder_path):
+            os.makedirs(subfolder_path)
+
+        # Move all files in the directory to the subfolder
+        for file in os.listdir(path):
+            if os.path.isfile(os.path.join(path, file)):
+                base_name, ext = os.path.splitext(file)
+                dest_file = os.path.join(subfolder_path, file)
+                count = 1
+                while os.path.exists(dest_file):
+                    new_name = f"{base_name}_{count}{ext}"
+                    dest_file = os.path.join(subfolder_path, new_name)
+                    count += 1
+                shutil.move(os.path.join(path, file), dest_file)
+
+    elif os.path.isfile(path):
+        # Create the subfolder if it doesn't exist
+        subfolder_path = os.path.join(os.path.dirname(path), subfolder)
+        if not os.path.exists(subfolder_path):
+            os.makedirs(subfolder_path)
+
+        # Move the file to the subfolder
+        base_name, ext = os.path.splitext(os.path.basename(path))
+        dest_file = os.path.join(subfolder_path, os.path.basename(path))
+        count = 1
+        while os.path.exists(dest_file):
+            new_name = f"{base_name}_{count}{ext}"
+            dest_file = os.path.join(subfolder_path, new_name)
+            count += 1
+        shutil.move(path, dest_file)
 
 # Root directory to start the recursive search
-root_directory = 'C:/Users/Simon/Downloads/stable-diffusion/consolidated/Sort/'
-#root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/'
-log_file = root_directory + "my_log.txt"
+#root_directory = 'C:/Users/Simon/Downloads/stable-diffusion/consolidated/'
+root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/Newfolder'
+
+log_file = os.path.join(root_directory,"my_log.txt")
 
 # Create a dictionary to store file hashes and corresponding folders
 file_hash_to_folder = {}
@@ -47,7 +136,7 @@ for root, dirs, files in os.walk(root_directory):
                     if parameter is not None:
                         #print(filename + " has metadata.")
                         hasparameters = True
-
+                        badfile = False
                     else:
                         #print("PNG with no metadata")
                         badfile = True
@@ -60,6 +149,65 @@ for root, dirs, files in os.walk(root_directory):
             continue
 
         if hasparameters==True:
+
+            model = ""
+            seed = ""
+            Loras = ""
+            new_filename = ""
+
+            model = getmodel(parameter)
+            seed = getseed(parameter)
+
+            if model is not None:
+                new_filename = model + '_'
+            else:
+                new_filename = "nomodel_"
+
+            if seed is not None:
+                new_filename = new_filename + seed  + '_'
+            else:
+                new_filename = new_filename + "noseed_"
+
+
+            new_filename = new_filename + '_' + get_sanitized_download_time(file_path) + '_'
+            # os.path.splitext(filename)[1]
+
+            if 'lora:' in parameter:
+                # Use a regular expression to find all words between lora: and :?>
+
+                if "Negative prompt" in parameter:
+                    parts = parameter.split("Negative prompt", 1)
+                else:
+                    parts = re.split(r'[\r\n]+', parameter)
+                    #parts = re.split(r'[\r\n]Steps', parameter)
+
+                if len(parts) > 1:
+                    matches = re.findall(r'lora:(.*?):', parts[0])
+                    Loras = '_'.join(matches)
+
+                    tags = findtags(parts[0])
+                else:
+                    print("Prompt me")
+
+
+                new_filename = new_filename + 'Loras_' + Loras + '_'
+            else:
+                print("uses no Loras")
+
+            new_filename = new_filename + os.path.splitext(filename)[1]
+            new_item_path = os.path.join(root, new_filename)
+
+            print(new_item_path)
+
+            if file_path not in new_item_path:
+                try:
+                    shutil.move(file_path, new_item_path)
+                except Exception as e:
+                    print(str(e))
+            else:
+                print("doesn't need moving.  Src and dest are the same: " + file_path + ' ' + new_item_path)
+
+
             if "Negative prompt" in parameter:
                 parts = parameter.split("Negative prompt", 1)
             else:
@@ -73,19 +221,19 @@ for root, dirs, files in os.walk(root_directory):
 
                     section_content = section_content.replace('\r', '').replace('\n', '')
 
-                    print(file_path + " . " + section_content)
+                    print(new_item_path + " . " + section_content)
 
                     values = extract_values_from_parameter(section_content)
                     values = [substring.strip() for substring in values]
 
                     all_values.extend(values)
 
-                    write_to_log(log_file, file_path + " . " + section_content)
+                    write_to_log(log_file, new_item_path + " . " + section_content)
 
                     # Calculate an MD5 hash of the section content
                     section_hash = hashlib.md5(section_content.encode()).hexdigest()
 
-                    msg = file_path + " . " + section_hash
+                    msg = new_item_path + " . " + section_hash
                     print(msg)
                     write_to_log(log_file, msg)
 
@@ -98,14 +246,18 @@ for root, dirs, files in os.walk(root_directory):
                         folder_name = section_hash
                         file_hash_to_folder[section_hash] = folder_name
 
-                    #hash_list.append([section_hash, filename, file_path])
-                    hash_list[section_hash].append([filename, file_path])
+                    #hash_list.append([section_hash, filename, new_item_path])
+                    hash_list[section_hash].append([new_filename, new_item_path])
 
 
                     if section_hash in hash_to_files:
-                        hash_to_files[section_hash].append(file_path)
+                        hash_to_files[section_hash].append(new_item_path)
                     else:
-                        hash_to_files[section_hash] = [file_path]
+                        hash_to_files[section_hash] = [new_item_path]
+
+        if badfile==True:
+                print(filename + " has no metadata.  Moving to nometa subdirectory")
+                move_to_subfolder(new_item_path,"nometa")
 
 showcounts = True
 
@@ -118,7 +270,7 @@ if showcounts == True:
     # Print the values and their occurrence counts
     for value, count in sorted_values:
         print(f'{value}: {count}')
-    csv_filename = root_directory + 'parameter_counts.csv'
+    csv_filename = os.path.join(root_directory,'parameter_counts.csv')
     with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
         csv_writer = csv.writer(csv_file)
         csv_writer.writerow(['description', 'count'])
@@ -129,7 +281,7 @@ if showcounts == True:
 writecsv = False
 # Create a CSV file to store the results
 if writecsv == True:
-    csv_filename = root_directory + 'hash_results.csv'
+    csv_filename = os.path.join(root_directory, 'hash_results.csv')
     with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
         csv_writer = csv.writer(csv_file)
         csv_writer.writerow(['Content Hash', 'Count', 'Filename', 'Full Path'])
