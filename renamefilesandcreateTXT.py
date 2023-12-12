@@ -122,6 +122,7 @@ def getmodel(mystr):
 
 for filename in os.listdir("."):
     badfile = False
+    hasparameters = False
     changeto = get_sanitized_download_time(filename)
 
     if filename.endswith(".png"):
@@ -131,6 +132,7 @@ for filename in os.listdir("."):
                 if parameter is not None:
                     print(filename + " has metadata.")
                     model = getmodel(parameter)
+                    hasparameters = True
                 else:
                     print("PNG with no metadata")
                     badfile = True
@@ -146,6 +148,7 @@ for filename in os.listdir("."):
         try:  
             parameter = get_jpeg_exif_comments(filename)
             model = getmodel(parameter)
+            hasparameters = True
            # input()
         except Exception as e:
             print(str(e))
@@ -162,22 +165,22 @@ for filename in os.listdir("."):
         if model is None:
             print("No Model specified in " + filename)
             model = "No_model_specified_"
-        else:
-            output_filename = sanitise_filename(model + "_" + changeto + ".txt")
-            print("found model: " + model + ".  Outputting parameters to " + output_filename)
+
+        output_filename = sanitise_filename(model + "_" + changeto + ".txt")
+        #print("found model: " + model + ".  Outputting parameters to " + output_filename)
+        
+        try:
+            with open(output_filename, "w", encoding="utf-8") as output_file:
+                print("Trying to write metadata to " + output_filename)
+                output_file.write(parameter)
+                #output_file.write(parameter)
+            copy_file_modification_time(filename,output_filename)
             
-            try:
-                with open(output_filename, "w", encoding="utf-8") as output_file:
-                    print("Trying to write metadata to " + output_filename)
-                    output_file.write(parameter)
-                    #output_file.write(parameter)
-                copy_file_modification_time(filename,output_filename)
-                
-            except:
-                output_filename = sanitise_filename("complexmodelfield_" + changeto + ".txt")
-                print("shouldn't get here " + output_filename)
-                with open(output_filename, "w", encoding="utf-8") as output_file:
-                    output_file.write(parameter)
+        except:
+            output_filename = sanitise_filename("complexmodelfield_" + changeto + ".txt")
+            print("shouldn't get here " + output_filename)
+            with open(output_filename, "w", encoding="utf-8") as output_file:
+                output_file.write(parameter)
 
         try:
             moveto = sanitise_filename(model + "_" + changeto + ".png")
