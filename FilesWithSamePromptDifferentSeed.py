@@ -110,8 +110,8 @@ def move_to_subfolder(path, subfolder):
         shutil.move(path, dest_file)
 
 # Root directory to start the recursive search
-#root_directory = 'C:/Users/Simon/Downloads/stable-diffusion/consolidated/'
-root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/Newfolder'
+root_directory = 'C:/Users/Simon/Downloads/stable-diffusion/consolidated/'
+#root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/Newfolder'
 
 log_file = os.path.join(root_directory,"my_log.txt")
 
@@ -139,7 +139,19 @@ for root, dirs, files in os.walk(root_directory):
                         badfile = False
                     else:
                         #print("PNG with no metadata")
-                        badfile = True
+                        try:
+                            parameter = img.info.get("prompt")
+                            if parameter is not None:
+                                #print(filename + " has metadata.")
+                                hasparameters = True
+                                badfile = False
+                                print("we don't handle comfyui yet")
+                                continue
+                            else:
+                                #print("PNG with no metadata")
+                                badfile = True
+                        except:
+                            badfile = True
                 except:
                     badfile = True
         elif filename.endswith(".jpeg") or filename.endswith(".jpg"):
@@ -205,7 +217,7 @@ for root, dirs, files in os.walk(root_directory):
                 except Exception as e:
                     print(str(e))
             else:
-                print("doesn't need moving.  Src and dest are the same: " + file_path + ' ' + new_item_path)
+                print("doesn't need renaming.  Src and dest are the same: " + file_path + ' ' + new_item_path)
 
 
             if "Negative prompt" in parameter:
