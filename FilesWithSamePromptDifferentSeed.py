@@ -10,6 +10,70 @@ from collections import defaultdict
 from collections import Counter
 import shutil
 
+def read_style_to_list(file_path):
+    data_array = []
+
+    #with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, 'r', encoding='utf-8-sig') as f:
+        
+        reader = csv.DictReader(f, delimiter=',')
+        for row in reader:
+            name = row['name'].lower()
+            pos_prompt = row['prompt'].lower()
+            neg_prompt = row['negative_prompt'].lower()
+
+            if not pos_prompt == '' or not neg_prompt == '':
+                data_array.append(row)
+            else:
+                print("ignoring delimiter " + name)
+
+
+    return data_array
+
+
+def checkposandneg(data_dict, string1, string2):
+    # Assuming the fields are named [string1example], [string2example], and [name]
+    field1_name = f"prompt"
+    field2_name = f"negative_prompt"
+    name_field = "name"
+
+    string1 = string1.lower()
+    string2 = string2.lower()
+    posprompt = []
+    negprompt = []
+    bothprompt = []
+    both = None
+    field1 = None
+    field2 = None
+    poscnt = 0
+    negcnt = 0
+    bothcnt = 0
+    #print(type(data_dict))
+    for entry in data_dict:
+       # print(entry)
+        posline = entry[field1_name].lower()
+        negline = entry[field2_name].lower()
+        if string1 in posline and string2 in negline and posline != '' and negline != '':
+            both = entry.get(name_field)
+            bothprompt.append(entry.get(name_field))
+            print("both.  ",posline,negline,both)
+            bothcnt +=1
+        elif string2 in negline and negline != '':
+            field2 =  entry.get(name_field)
+            #test = negline
+            negprompt.append(entry.get(name_field))
+            print("field2",negline,field2)
+            negcnt +=1
+        elif string1 in posline and posline != '':
+            field1 = entry.get(name_field)
+            #test = posline
+            posprompt.append(entry.get(name_field))
+            print("field1",posline,field1)
+            poscnt +=1
+
+    print("Counters are both,pos,neg" ,bothcnt,poscnt,negcnt )    
+    return bothprompt,posprompt,negprompt,bothcnt,poscnt,negcnt
+
 def extract_text_after2(list_obj, text):
     for element in list_obj:
         if element.strip().lower().startswith(text.lower() + ":"):
@@ -53,11 +117,39 @@ def get_sanitized_download_time(filepath):
     # Return the sanitized datetime string
     return sanitized_dt_string
 
+def getnegprompt(parameter):
+    if "Negative prompt" in parameter:
+        negprompt = parameter.split("Negative prompt", 1)[1]
+    else:
+        negprompt = re.split(r'[\r\n]+', parameter)[1]
+        #negprompt = re.split(r'[\r\n]Steps', parameter)
+    if negprompt.startswith(": "):
+        # Remove the first occurrence of ":"
+        negprompt = negprompt[2:] 
+    return negprompt
+def getposprompt(parameter):
 
-def extract_values_from_parameter(parameter):
-    # Use regular expressions to extract values from the parameter section
-    values = parameter.split(",")
-    return values
+    all_values2 = []
+    if "Negative prompt" in parameter:
+        parts = parameter.split("Negative prompt", 1)
+    else:
+        parts = re.split(r'[\r\n]+', parameter)
+        
+    if len(parts) >= 1:
+        # Use regular expressions to extract the 'parameter' section
+            section_content = parts[0]
+            section_content = section_content.replace('\r\n', '')
+            section_content = section_content.replace('\r', '').replace('\n', '')
+
+    return section_content
+
+def getloras(parameter):
+
+    matches = re.findall(r'lora:(.*?):', parameter)
+    Loras = '_'.join(matches)
+
+    #tags = findtags(parameter)
+    return Loras
 
 def write_to_log(log_file, message):
     try:
@@ -110,7 +202,7 @@ def move_to_subfolder(path, subfolder):
         shutil.move(path, dest_file)
 
 # Root directory to start the recursive search
-root_directory = 'C:/Users/Simon/Downloads/stable-diffusion/consolidated/'
+root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/1uciajavorcekova'
 #root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/Newfolder'
 
 log_file = os.path.join(root_directory,"my_log.txt")
@@ -119,7 +211,8 @@ log_file = os.path.join(root_directory,"my_log.txt")
 file_hash_to_folder = {}
 hash_to_files = {}
 hash_list = defaultdict(list)
-all_values = []
+pos_values = []
+neg_values = []
 
 
 # Iterate through all files in the root_directory and its subdirectories
@@ -169,6 +262,20 @@ for root, dirs, files in os.walk(root_directory):
 
             model = getmodel(parameter)
             seed = getseed(parameter)
+            positiveprompt = getposprompt(parameter)
+            negativeprompt = getnegprompt(parameter)
+            loras = getloras(parameter)
+
+            posvalues = positiveprompt.split(",")
+            posvalues = [substring.strip() for substring in posvalues]
+            #list of positive prompt entries
+            #pos_values.extend(posvalues)
+
+            negvalues = negativeprompt.split(",")
+            negvalues = [substring.strip() for substring in negvalues]
+            #list of positive prompt entries
+            #negvalues.extend(neg_values)
+           
 
             if model is not None:
                 new_filename = model + '_'
@@ -188,16 +295,16 @@ for root, dirs, files in os.walk(root_directory):
                 # Use a regular expression to find all words between lora: and :?>
 
                 if "Negative prompt" in parameter:
-                    parts = parameter.split("Negative prompt", 1)
+                    negprompt = parameter.split("Negative prompt", 1)
                 else:
-                    parts = re.split(r'[\r\n]+', parameter)
-                    #parts = re.split(r'[\r\n]Steps', parameter)
+                    negprompt = re.split(r'[\r\n]+', parameter)
+                    #negprompt = re.split(r'[\r\n]Steps', parameter)
 
-                if len(parts) > 1:
-                    matches = re.findall(r'lora:(.*?):', parts[0])
+                if len(negprompt) > 1:
+                    matches = re.findall(r'lora:(.*?):', negprompt[0])
                     Loras = '_'.join(matches)
 
-                    tags = findtags(parts[0])
+                    tags = findtags(negprompt[0])
                 else:
                     print("Prompt me")
 
@@ -227,23 +334,11 @@ for root, dirs, files in os.walk(root_directory):
                 
             if len(parts) >= 1:
                 # Use regular expressions to extract the 'parameter' section
-                    section_content = parts[0]
 
-                    section_content = section_content.replace('\r\n', '')
-
-                    section_content = section_content.replace('\r', '').replace('\n', '')
-
-                    print(new_item_path + " . " + section_content)
-
-                    values = extract_values_from_parameter(section_content)
-                    values = [substring.strip() for substring in values]
-
-                    all_values.extend(values)
-
-                    write_to_log(log_file, new_item_path + " . " + section_content)
+                    write_to_log(log_file, new_item_path + " . " + positiveprompt)
 
                     # Calculate an MD5 hash of the section content
-                    section_hash = hashlib.md5(section_content.encode()).hexdigest()
+                    section_hash = hashlib.md5(positiveprompt.encode()).hexdigest()
 
                     msg = new_item_path + " . " + section_hash
                     print(msg)
@@ -274,7 +369,7 @@ for root, dirs, files in os.walk(root_directory):
 showcounts = True
 
 if showcounts == True:
-    value_counts = Counter(all_values)
+    value_counts = Counter(pos_values)
 
     # Sort values by occurrence count in decreasing order
     sorted_values = sorted(value_counts.items(), key=lambda x: x[1], reverse=True)
