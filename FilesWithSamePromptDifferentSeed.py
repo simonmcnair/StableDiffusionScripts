@@ -100,8 +100,6 @@ def findtags(inputstring):
     inputstring = inputstring.replace("\r", "")
     inputstring = inputstring.replace("\n", "")
     inputstring = [substring.strip() for substring in inputstring.split(',')]
-
-    
     print(inputstring)
     return
 
@@ -129,7 +127,6 @@ def getnegprompt(parameter):
     return negprompt
 def getposprompt(parameter):
 
-    all_values2 = []
     if "Negative prompt" in parameter:
         parts = parameter.split("Negative prompt", 1)
     else:
@@ -140,16 +137,20 @@ def getposprompt(parameter):
             section_content = parts[0]
             section_content = section_content.replace('\r\n', '')
             section_content = section_content.replace('\r', '').replace('\n', '')
-
     return section_content
 
 def getloras(parameter):
 
     matches = re.findall(r'lora:(.*?):', parameter)
-    Loras = '_'.join(matches)
+    Loras = '_'.join(set(matches))
 
-    #tags = findtags(parameter)
-    return Loras
+    #Loras = '_'.join(matches)
+
+    if len(Loras) >0:
+        #print("Lora !")
+        return Loras
+    else:
+        return ""
 
 def write_to_log(log_file, message):
     try:
@@ -202,7 +203,7 @@ def move_to_subfolder(path, subfolder):
         shutil.move(path, dest_file)
 
 # Root directory to start the recursive search
-root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/1uciajavorcekova'
+root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/AmyWong'
 #root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/Newfolder'
 
 log_file = os.path.join(root_directory,"my_log.txt")
@@ -257,8 +258,10 @@ for root, dirs, files in os.walk(root_directory):
 
             model = ""
             seed = ""
-            Loras = ""
+            loras = ""
             new_filename = ""
+            positiveprompt = ""
+            negativeprompt = ""
 
             model = getmodel(parameter)
             seed = getseed(parameter)
@@ -266,17 +269,18 @@ for root, dirs, files in os.walk(root_directory):
             negativeprompt = getnegprompt(parameter)
             loras = getloras(parameter)
 
-            posvalues = positiveprompt.split(",")
-            posvalues = [substring.strip() for substring in posvalues]
-            #list of positive prompt entries
-            #pos_values.extend(posvalues)
+            if positiveprompt != "":
+                posvalues = positiveprompt.split(",")
+                posvalues = [substring.strip() for substring in posvalues]
+                #list of positive prompt entries
+                #pos_values.extend(posvalues)
 
-            negvalues = negativeprompt.split(",")
-            negvalues = [substring.strip() for substring in negvalues]
-            #list of positive prompt entries
-            #negvalues.extend(neg_values)
+            if negativeprompt != "":
+                negvalues = negativeprompt.split(",")
+                negvalues = [substring.strip() for substring in negvalues]
+                #list of positive prompt entries
+                #negvalues.extend(neg_values)
            
-
             if model is not None:
                 new_filename = model + '_'
             else:
@@ -291,27 +295,10 @@ for root, dirs, files in os.walk(root_directory):
             new_filename = new_filename + '_' + get_sanitized_download_time(file_path) + '_'
             # os.path.splitext(filename)[1]
 
-            if 'lora:' in parameter:
-                # Use a regular expression to find all words between lora: and :?>
-
-                if "Negative prompt" in parameter:
-                    negprompt = parameter.split("Negative prompt", 1)
-                else:
-                    negprompt = re.split(r'[\r\n]+', parameter)
-                    #negprompt = re.split(r'[\r\n]Steps', parameter)
-
-                if len(negprompt) > 1:
-                    matches = re.findall(r'lora:(.*?):', negprompt[0])
-                    Loras = '_'.join(matches)
-
-                    tags = findtags(negprompt[0])
-                else:
-                    print("Prompt me")
-
-
-                new_filename = new_filename + 'Loras_' + Loras + '_'
-            else:
-                print("uses no Loras")
+            if loras != "":
+                new_filename = new_filename + 'Loras_' + loras + '_'
+            #else:
+            #    print("uses no Loras")
 
             new_filename = new_filename + os.path.splitext(filename)[1]
             new_item_path = os.path.join(root, new_filename)
@@ -326,13 +313,7 @@ for root, dirs, files in os.walk(root_directory):
             else:
                 print("doesn't need renaming.  Src and dest are the same: " + file_path + ' ' + new_item_path)
 
-
-            if "Negative prompt" in parameter:
-                parts = parameter.split("Negative prompt", 1)
-            else:
-                parts = re.split(r'[\r\n]+', parameter)
-                
-            if len(parts) >= 1:
+            if positiveprompt != "":
                 # Use regular expressions to extract the 'parameter' section
 
                     write_to_log(log_file, new_item_path + " . " + positiveprompt)
