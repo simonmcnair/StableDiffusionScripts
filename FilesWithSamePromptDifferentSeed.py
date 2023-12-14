@@ -103,6 +103,15 @@ def findtags(inputstring):
     print(inputstring)
     return
 
+def sanitize_path_name(folder_name):
+    # Define a regular expression pattern to match invalid characters
+    invalid_chars_pattern = re.compile(r'[\\/:"*?<>|]')
+
+    # Replace invalid characters with an empty string
+    sanitized_folder_name = re.sub(invalid_chars_pattern, '', folder_name)
+
+    return sanitized_folder_name
+
 def get_sanitized_download_time(filepath):
     # Get the modification time of the file
     mtime = os.path.getmtime(filepath)
@@ -119,7 +128,10 @@ def getnegprompt(parameter):
     if "Negative prompt" in parameter:
         negprompt = parameter.split("Negative prompt", 1)[1]
     else:
-        negprompt = re.split(r'[\r\n]+', parameter)[1]
+        try:
+            negprompt = re.split(r'[\r\n]+', parameter)[1]
+        except:
+            return None
         #negprompt = re.split(r'[\r\n]Steps', parameter)
     if negprompt.startswith(": "):
         # Remove the first occurrence of ":"
@@ -130,7 +142,10 @@ def getposprompt(parameter):
     if "Negative prompt" in parameter:
         parts = parameter.split("Negative prompt", 1)
     else:
-        parts = re.split(r'[\r\n]+', parameter)
+        try:
+            parts = re.split(r'[\r\n]+', parameter)
+        except:
+            return None
         
     if len(parts) >= 1:
         # Use regular expressions to extract the 'parameter' section
@@ -158,6 +173,29 @@ def write_to_log(log_file, message):
             file.write(message + '\n')
     except Exception as e:
         print(f"Error writing to the log file: {e}")
+
+def move_file_to_meta(filename, subfolder_name):
+    file_location = os.path.dirname(filename)
+    destination_folder = os.path.join(file_location, subfolder_name)
+
+    subfolder_name = sanitize_path_name(subfolder_name)
+    if not os.path.exists(destination_folder):
+        os.makedirs(destination_folder)
+
+    # Construct the destination path
+    destination = os.path.join(destination_folder, os.path.basename(filename))
+
+    # Handle duplicate filenames
+    base, ext = os.path.splitext(destination)
+    count = 1
+    while os.path.exists(destination):
+        destination = f"{base}_{count}{ext}"
+        count += 1
+
+    try:
+        shutil.move(filename, destination)
+    except Exception as e:
+        print(f"Error moving '{filename}' to '{destination}': {str(e)}")
 
 def move_to_subfolder(path, subfolder):
     # Check if the path is a directory or a file
@@ -203,9 +241,10 @@ def move_to_subfolder(path, subfolder):
         shutil.move(path, dest_file)
 
 # Root directory to start the recursive search
-root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/AmyWong'
+#root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/AmyWong'
 #root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/Newfolder'
-
+#root_directory = 'Z:/Pron/Pics/stable-diffusion/Sort'
+root_directory = 'W:/complete/ai'
 log_file = os.path.join(root_directory,"my_log.txt")
 
 # Create a dictionary to store file hashes and corresponding folders
@@ -269,13 +308,13 @@ for root, dirs, files in os.walk(root_directory):
             negativeprompt = getnegprompt(parameter)
             loras = getloras(parameter)
 
-            if positiveprompt != "":
+            if positiveprompt != ""and positiveprompt is not None:
                 posvalues = positiveprompt.split(",")
                 posvalues = [substring.strip() for substring in posvalues]
                 #list of positive prompt entries
                 #pos_values.extend(posvalues)
 
-            if negativeprompt != "":
+            if negativeprompt != "" and negativeprompt is not None:
                 negvalues = negativeprompt.split(",")
                 negvalues = [substring.strip() for substring in negvalues]
                 #list of positive prompt entries
@@ -301,6 +340,7 @@ for root, dirs, files in os.walk(root_directory):
             #    print("uses no Loras")
 
             new_filename = new_filename + os.path.splitext(filename)[1]
+            new_filename = sanitize_path_name(new_filename)
             new_item_path = os.path.join(root, new_filename)
 
             print(new_item_path)
@@ -345,7 +385,7 @@ for root, dirs, files in os.walk(root_directory):
 
         if badfile==True:
                 print(filename + " has no metadata.  Moving to nometa subdirectory")
-                move_to_subfolder(new_item_path,"nometa")
+                move_to_subfolder(file_path,"nometa")
 
 showcounts = True
 
@@ -406,7 +446,10 @@ for hash, files in hash_to_files.items():
                                 print("Already in correct location")
                             else:
                                 os.makedirs(folder_name, exist_ok=True)
-                                os.rename(file_path, new_file_path)
+                                try:
+                                    os.rename(file_path, new_file_path)
+                                except Exception as e:
+                                    print("oops " + str(e))
                                 print(f"Moved: {file_path} to {new_file_path}")
             #elif renamefiles == True:
             #    for file_path in files:
