@@ -45,52 +45,6 @@ def read_style_to_list(file_path):
 
     return data_array
 
-
-def checkposandneg(data_dict, positiveprompt, negativeprompt):
-    # Assuming the fields are named [positivepromptexample], [negativepromptexample], and [name]
-    field1_name = f"prompt"
-    field2_name = f"negative_prompt"
-    name_field = "name"
-
-    positiveprompt = positiveprompt.lower()
-    negativeprompt = negativeprompt.lower()
-    posprompt = []
-    negprompt = []
-    bothprompt = []
-    both = None
-    field1 = None
-    field2 = None
-    poscnt = 0
-    negcnt = 0
-    bothcnt = 0
-    #print(type(data_dict))
-    for entry in data_dict:
-       # print(entry)
-        if '{prompt}' in str(entry):
-            print("pause" + str(entry))
-        posline = entry[field1_name].lower()
-        negline = entry[field2_name].lower()
-        if positiveprompt in posline and negativeprompt in negline and posline != '' and negline != '':
-            both = entry.get(name_field)
-            bothprompt.append(entry.get(name_field))
-            print("both.  ",posline,negline,both)
-            bothcnt +=1
-        elif negativeprompt in negline and negline != '':
-            field2 =  entry.get(name_field)
-            #test = negline
-            negprompt.append(entry.get(name_field))
-            print("field2",negline,field2)
-            negcnt +=1
-        elif positiveprompt in posline and posline != '':
-            field1 = entry.get(name_field)
-            #test = posline
-            posprompt.append(entry.get(name_field))
-            print("field1",posline,field1)
-            poscnt +=1
-
-    print("Counters are both,pos,neg" ,bothcnt,poscnt,negcnt )    
-    return bothprompt,posprompt,negprompt,bothcnt,poscnt,negcnt
-
 def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
 
     posprompt = False
@@ -201,7 +155,7 @@ def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
                 #print("All members of array2 are present in array1")
                 pos1 = [item for item in positivepromptarray  if item not in styleposprompt]
                 # Add a single value 'match' to array1
-                pos1.append('__STYLE_' + promp + '__')
+                pos1.append('z_' + promp + '__')
                 print('replaced ' + str(positivepromptarray) + " with " + str(pos1))
                 positivepromptarray = pos1
 
@@ -211,7 +165,7 @@ def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
                 #print("All members of array2 are present in array1")
                 neg1 = [item for item in negativepromptarray if item not in stylenegprompt ]
                 # Add a single value 'match' to array1
-                neg1.append('__STYLE_' + promp + '__')
+                neg1.append('z_' + promp + '__')
                 print('replaced ' + str(negativepromptarray) + " with " + str(neg1))
                 negativepromptarray = neg1
 
@@ -226,28 +180,38 @@ def extract_text_after2(list_obj, text):
             return element.split(":")[-1].strip()
     return None
 
-def getmodel(mystr):
-    test = parameter.split(",")
-    try:
-        res = extract_text_after2(test,"Model")
-    except:
-        return None
-    return res
+def properwaytogetPromptfield(mystr,fieldtoretrieve=''):
+    test = mystr.split("\n")
 
-def getseed(mystr):
-    test = parameter.split(",")
+    ret = None
+    if fieldtoretrieve == '':
+        test[0] = test[0].replace("  ", " ")
+        ret = [substring.strip() for substring in test[0].split(',')]
+    else:
+        for each in test:
+
+            if fieldtoretrieve in each:
+
+                fieldtoretrieve = fieldtoretrieve.replace("  "," ")
+                if fieldtoretrieve in ['steps','sampler','cfg scale','seed','model']:
+                    mystr = [substring.strip() for substring in each.split(',')]
+                    res = extract_text_after2(mystr,fieldtoretrieve)
+                    return res
+
+                temp = each.split(':')
+                if temp[0] == fieldtoretrieve:
+                    ret = [substring.strip() for substring in temp[1].split(',')]
+    
+    return ret
+
+
+def getTemplate(mystr):
+    test = parameter.split("\n")
     try:
-        res = extract_text_after2(test,"Seed")
+        res = extract_text_after2(test,"template")
     except:
         return None
     return res
-    
-def findtags(inputstring):
-    inputstring = inputstring.replace("\r", "")
-    inputstring = inputstring.replace("\n", "")
-    inputstring = [substring.strip() for substring in inputstring.split(',')]
-    print(inputstring)
-    return
 
 def sanitize_path_name(folder_name):
     # Define a regular expression pattern to match invalid characters
@@ -269,44 +233,6 @@ def get_sanitized_download_time(filepath):
     sanitized_dt_string = dt_string.replace(" ", "_").replace(":", "_")
     # Return the sanitized datetime string
     return sanitized_dt_string
-
-def getnegprompt(parameter):
-    if '\r\n' in parameter:
-        parameter = parameter.replace('\r\n','\n')
-
-    if "negative prompt" in parameter:
-        negprompt = parameter.split("negative prompt: ", 1)[1]
-        negprompt = re.split(r'\n', negprompt)[0]
-    else:
-        try:
-            negprompt = re.split(r'[\n]+', parameter)[1]
-            negprompt = re.split(r'\n', negprompt)[0]
-        except:
-            return None
-        #negprompt = re.split(r'[\r\n]Steps', parameter)
-    #if negprompt.startswith(": "):
-        # Remove the first occurrence of ":"
-    #    negprompt = negprompt[2:] 
-    return negprompt
-def getposprompt(parameter):
-
-    if '\r\n' in parameter:
-        parameter = parameter.replace('\r\n','\n')
-
-    if "negative prompt" in parameter:
-        parts = parameter.split("negative prompt: ", 1)
-    else:
-        try:
-            parts = re.split(r'[\n]+', parameter)
-        except:
-            return None
-        
-    if len(parts) >= 1:
-        # Use regular expressions to extract the 'parameter' section
-            section_content = parts[0]
-            section_content = section_content.replace('\r\n', '')
-            section_content = section_content.replace('\r', '').replace('\n', '')
-    return section_content
 
 def getloras(parameter):
 
@@ -397,6 +323,7 @@ def move_to_subfolder(path, subfolder):
 # Root directory to start the recursive search
 #root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/AmyWong'
 root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/'
+#root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/Template 1girl,  glossy __ColorsBasic__  latex suit'
 #root_directory = 'Z:/Pron/Pics/stable-diffusion/Sort'
 #root_directory = 'W:/complete/ai'
 stylefilepath = 'X:/dif/stable-diffusion-webui-docker/data/config/auto/styles.csv'
@@ -432,6 +359,13 @@ for root, dirs, files in os.walk(root_directory):
                         hasparameters = True
                         badfile = False
                         parameter = parameter.lower()
+                        Tem = None
+
+                        steps = properwaytogetPromptfield(parameter,"steps")
+                        if 'template:' in parameter:
+                            print("template")
+                            #tem = getTemplate(parameter)
+                            template = properwaytogetPromptfield(parameter,"template")
                     else:
                         #print("PNG with no metadata")
                         try:
@@ -464,30 +398,35 @@ for root, dirs, files in os.walk(root_directory):
             positiveprompt = ""
             negativeprompt = ""
 
-            model = getmodel(parameter)
-            seed = getseed(parameter)
-            positiveprompt = getposprompt(parameter)
-            negativeprompt = getnegprompt(parameter)
+            #model = getmodel(parameter)
+            model = properwaytogetPromptfield(parameter,"model")
+            seed = properwaytogetPromptfield(parameter,"seed")
+
+            #seed = getseed(parameter)
+            positivepromptarray = properwaytogetPromptfield(parameter,"")
+            negativepromptarray = properwaytogetPromptfield(parameter,"negative prompt")
+            #positiveprompt = getposprompt(parameter)
+            #negativeprompt = getnegprompt(parameter)
             loras = getloras(parameter)
 
-            if positiveprompt != ""and positiveprompt is not None:
-                posvalues = positiveprompt.split(",")
-                posvalues = [substring.strip() for substring in posvalues]
+            #if positiveprompt != ""and positiveprompt is not None:
+            #    posvalues = positiveprompt.split(",")
+            #    posvalues = [substring.strip() for substring in posvalues]
                 #list of positive prompt entries
                 #pos_values.extend(posvalues)
-                posvalues = sorted(posvalues)
+            #positivepromptarray = sorted(positivepromptarray)
 
 
-            if negativeprompt != "" and negativeprompt is not None:
-                negvalues = negativeprompt.split(",")
-                negvalues = [substring.strip() for substring in negvalues]
+            #if negativeprompt != "" and negativeprompt is not None:
+            #    negvalues = negativeprompt.split(",")
+            #    negvalues = [substring.strip() for substring in negvalues]
                 #list of positive prompt entries
-                #negvalues.extend(neg_values)
-                negvalues = sorted(negvalues)
+            #    #negvalues.extend(neg_values)
+            negativepromptarray = sorted(negativepromptarray)
 
             if readstyles == True:
                 #checkposandneg(stylevars,positiveprompt,negativeprompt)
-                pos1, neg1 = checkposandnegarrays(stylevars,posvalues,negvalues)
+                pos1, neg1 = checkposandnegarrays(stylevars,positivepromptarray,negativepromptarray)
             else:
                 print("no Styles file")
 
@@ -502,8 +441,8 @@ for root, dirs, files in os.walk(root_directory):
                 negativeprompt = ','.join(neg1)
             else:
                 print("No embedded Styles used")
-                positiveprompt = ','.join(posvalues)
-                negativeprompt = ','.join(negvalues)
+                positiveprompt = ','.join(positivepromptarray)
+                negativeprompt = ','.join(negativepromptarray)
 
                 #positiveprompt = posvalues.join(",")
                 #negativeprompt = negvalues.join(",")
