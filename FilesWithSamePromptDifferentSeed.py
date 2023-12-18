@@ -70,11 +70,11 @@ def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
         stylenegprompt = entry['negative_prompt']
         stylename = entry['name']
 
-        print("style name: " + str(stylename))
-        print("style positive prompt: " + str(styleposprompt))
-        print("style negative prompt: " + str(stylenegprompt))
-        print("check against positive of " + str(positivepromptarray))
-        print("check against negative of " + str(negativepromptarray))
+        #print("style name: " + str(stylename))
+        #print("style positive prompt: " + str(styleposprompt))
+        #print("style negative prompt: " + str(stylenegprompt))
+        #print("check against positive of " + str(positivepromptarray))
+        #print("check against negative of " + str(negativepromptarray))
         pos = False
         neg = False
         #if 'latex' in stylename:
@@ -84,7 +84,7 @@ def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
                 #print('{prompt} present in positive prompt: ' + styleposprompt)
                 styleposprompt = styleposprompt.replace('{prompt}','')
                 #del my_dict['key2']
-                print('{prompt} removed from positive prompt: ' + styleposprompt)
+                #print('{prompt} removed from positive prompt: ' + styleposprompt)
 
             styleposprompt = styleposprompt.replace(', ',',')
             styleposprompt = styleposprompt.replace(',,',',')
@@ -98,28 +98,16 @@ def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
             styleposprompt = [item for item in styleposprompt if item]
 
             #pos = all(item in styleposprompt for item in positivepromptarray)
-
             pos = all(item in positivepromptarray for item in styleposprompt)
-
-            print("")
-            print("")
-            print("")
-            print("styleposprompt:", styleposprompt)
-            print("")
-            print("positiveprompt:", positivepromptarray)
-
             posopp = all(item not in styleposprompt for item in positivepromptarray)
-            if pos == True:
-                print("Hooray")
-
-        else:
-            print("Style has empty positive prompt or prompt is empty.  will always match")
+    #    else:
+    #        print("Style has empty positive prompt or prompt is empty.  will always match")
 
         if str(stylenegprompt) != '' and negprompt == True:
             if '{prompt}' in stylenegprompt:
                 #print('{prompt} present in negative prompt: '  + stylenegprompt)
                 stylenegprompt = stylenegprompt.replace('{prompt}','')               
-                print('{prompt} removed from negative prompt: ' + stylenegprompt)
+                #print('{prompt} removed from negative prompt: ' + stylenegprompt)
  
             stylenegprompt = stylenegprompt.replace(', ',',')
             stylenegprompt = stylenegprompt.replace(',,',',')
@@ -129,49 +117,44 @@ def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
             #this is for list
             #stylenegprompt = {key: value for key, value in stylenegprompt.items() if value}
             
-            #this i for disct
+            #this i for dict
             stylenegprompt = [item for item in stylenegprompt if item]
-
             neg = all(item in negativepromptarray for item in stylenegprompt)
-            print("")
-            print("")
-            print("")
-            print("stylenegprompt:", stylenegprompt)
-            print("")
-            print("negativeprompt:", negativepromptarray)
-            if neg == True:
-                print("hooray")
             negopp = all(item not in stylenegprompt for item in negativepromptarray)
 
-        else:
-            print("Style has Empty negative prompt or negprompt is empty.  Will always be a match")
+    #    else:
+    #        print("Style has Empty negative prompt or negprompt is empty.  Will always be a match")
 
         if (pos or styleposprompt == '' ) and (neg or stylenegprompt == ''):
             print("Neg and positive match for a style")
             cntr += 1
             if pos:
-                print("positive matches")
+                #print("positive matches")
                 promp = entry['name']
                 #print("All members of array2 are present in array1")
                 pos1 = [item for item in positivepromptarray  if item not in styleposprompt]
                 # Add a single value 'match' to array1
                 pos1.append('z_' + promp + '__')
-                print('replaced ' + str(positivepromptarray) + " with " + str(pos1))
+                #print('replaced ' + str(positivepromptarray) + " with " + str(pos1))
                 positivepromptarray = pos1
 
             if neg:
-                print("neg matches")
+                #print("neg matches")
                 promp = entry['name']
                 #print("All members of array2 are present in array1")
                 neg1 = [item for item in negativepromptarray if item not in stylenegprompt ]
                 # Add a single value 'match' to array1
                 neg1.append('z_' + promp + '__')
-                print('replaced ' + str(negativepromptarray) + " with " + str(neg1))
+                #print('replaced ' + str(negativepromptarray) + " with " + str(neg1))
                 negativepromptarray = neg1
 
 
-    print("number of matches is " + str(cntr))
-    #print("Counters are both,pos,neg" ,bothcnt,poscnt,negcnt )    
+    #print("Counters are both,pos,neg" ,bothcnt,poscnt,negcnt )  
+    if pos1 ==False and neg1 == False:
+        print("no Styles found in prompt")  
+    else:
+        print("number of matches is " + str(cntr))
+        
     return pos1, neg1
 
 def extract_text_after2(list_obj, text):
@@ -180,7 +163,19 @@ def extract_text_after2(list_obj, text):
             return element.split(":")[-1].strip()
     return None
 
+def ensure_comma_before_lt(input_string):
+    # Use a regular expression to match '<' not preceded by a comma
+    pattern = re.compile(r'(?<!,)(<)')
+    
+    # Insert a comma before '<' using the sub method
+    result_string = pattern.sub(r',\1', input_string)
+    
+    return result_string
+
 def properwaytogetPromptfield(mystr,fieldtoretrieve=''):
+    if 'lora' in mystr:
+        #print("Lora")
+        mystr = ensure_comma_before_lt(mystr)
     test = mystr.split("\n")
 
     ret = None
@@ -195,23 +190,11 @@ def properwaytogetPromptfield(mystr,fieldtoretrieve=''):
                 fieldtoretrieve = fieldtoretrieve.replace("  "," ")
                 if fieldtoretrieve in ['steps','sampler','cfg scale','seed','model']:
                     mystr = [substring.strip() for substring in each.split(',')]
-                    res = extract_text_after2(mystr,fieldtoretrieve)
-                    return res
-
+                    return extract_text_after2(mystr,fieldtoretrieve)
                 temp = each.split(':')
                 if temp[0] == fieldtoretrieve:
-                    ret = [substring.strip() for substring in temp[1].split(',')]
-    
+                    ret = [substring.strip() for substring in temp[1].split(',')] 
     return ret
-
-
-def getTemplate(mystr):
-    test = parameter.split("\n")
-    try:
-        res = extract_text_after2(test,"template")
-    except:
-        return None
-    return res
 
 def sanitize_path_name(folder_name):
     # Define a regular expression pattern to match invalid characters
@@ -343,6 +326,7 @@ if readstyles == True:
     else:
         readstyles = False
 
+counter = 0
 # Iterate through all files in the root_directory and its subdirectories
 for root, dirs, files in os.walk(root_directory):
     for filename in files:
@@ -351,6 +335,8 @@ for root, dirs, files in os.walk(root_directory):
         file_path = os.path.join(root, filename)
 
         if filename.endswith(".png"):
+            counter += 1
+            print("Processing: " + str(counter))
             with Image.open(file_path) as img:
                 try:
                     parameter = img.info.get("parameters")
@@ -359,13 +345,16 @@ for root, dirs, files in os.walk(root_directory):
                         hasparameters = True
                         badfile = False
                         parameter = parameter.lower()
-                        Tem = None
+                        template = None
+                        istemplate = False
 
                         steps = properwaytogetPromptfield(parameter,"steps")
                         if 'template:' in parameter:
-                            print("template")
+                            print("template\n" + parameter)
+                            istemplate = True
                             #tem = getTemplate(parameter)
                             template = properwaytogetPromptfield(parameter,"template")
+
                     else:
                         #print("PNG with no metadata")
                         try:
@@ -398,34 +387,21 @@ for root, dirs, files in os.walk(root_directory):
             positiveprompt = ""
             negativeprompt = ""
 
-            #model = getmodel(parameter)
             model = properwaytogetPromptfield(parameter,"model")
             seed = properwaytogetPromptfield(parameter,"seed")
 
-            #seed = getseed(parameter)
-            positivepromptarray = properwaytogetPromptfield(parameter,"")
+            if istemplate == False:
+                positivepromptarray = properwaytogetPromptfield(parameter,"")
+            else:
+                positivepromptarray = template
             negativepromptarray = properwaytogetPromptfield(parameter,"negative prompt")
-            #positiveprompt = getposprompt(parameter)
-            #negativeprompt = getnegprompt(parameter)
+
             loras = getloras(parameter)
 
-            #if positiveprompt != ""and positiveprompt is not None:
-            #    posvalues = positiveprompt.split(",")
-            #    posvalues = [substring.strip() for substring in posvalues]
-                #list of positive prompt entries
-                #pos_values.extend(posvalues)
-            #positivepromptarray = sorted(positivepromptarray)
-
-
-            #if negativeprompt != "" and negativeprompt is not None:
-            #    negvalues = negativeprompt.split(",")
-            #    negvalues = [substring.strip() for substring in negvalues]
-                #list of positive prompt entries
-            #    #negvalues.extend(neg_values)
             negativepromptarray = sorted(negativepromptarray)
 
             if readstyles == True:
-                #checkposandneg(stylevars,positiveprompt,negativeprompt)
+
                 pos1, neg1 = checkposandnegarrays(stylevars,positivepromptarray,negativepromptarray)
             else:
                 print("no Styles file")
@@ -434,16 +410,17 @@ for root, dirs, files in os.walk(root_directory):
                 print("Embedded Styles were used")
                 pos1 = sorted(pos1)
                 neg1 = sorted(neg1)
-                #positiveprompt = pos1.join(",")
-                positiveprompt = ','.join(pos1)
 
-                #negativeprompt = neg1.join(",")
+                positiveprompt = ','.join(pos1)
                 negativeprompt = ','.join(neg1)
+
             else:
                 print("No embedded Styles used")
+                positiveprompt = sorted(positiveprompt)
+                negativeprompt = sorted(negativeprompt)
+                
                 positiveprompt = ','.join(positivepromptarray)
                 negativeprompt = ','.join(negativepromptarray)
-
                 #positiveprompt = posvalues.join(",")
                 #negativeprompt = negvalues.join(",")
 
