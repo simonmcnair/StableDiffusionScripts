@@ -9,8 +9,14 @@ import csv
 from collections import defaultdict
 from collections import Counter
 import shutil
-import prompt_parser
-import generation_parameters_copypaste
+
+#pip install nltk
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+
+nltk.download('punkt')
+nltk.download('stopwords')
 
 def read_style_to_list(file_path):
     data_array = []
@@ -47,6 +53,48 @@ def read_style_to_list(file_path):
 
     return data_array
 
+def create_word_groups(filepath_strings,percentagesimilar=90):
+    word_groups = []
+
+    # Convert the dictionary items to a list for easy iteration
+    items = list(filepath_strings.items())
+
+    while items:
+        current_filepath, current_string = items.pop(0)
+
+        current_group = [current_filepath]
+        current_words = set(word_tokenize(current_string[0].lower()))
+
+        i = 0
+        while i < len(items):
+            print(str(i) + " of " + str(len(items)))
+            compare_filepath, compare_string = items[i]
+            compare_words = set(word_tokenize(compare_string[0].lower()))
+
+            # Remove stop words (optional)
+            stop_words = set(stopwords.words('english'))
+            current_words = current_words - stop_words
+            compare_words = compare_words - stop_words
+
+            # Calculate the intersection of the sets
+            common_words = current_words.intersection(compare_words)
+
+            # Calculate the percentage of common words
+            percentage_common = len(common_words) / max(len(current_words), len(compare_words)) * 100
+
+            # If over 90% of words are the same, add the filepath to the current group
+            if percentage_common > percentagesimilar:
+                current_group.append(compare_filepath)
+                items.pop(i)  # Remove the compared item from the list
+            else:
+                i += 1
+
+        # Add the current group to the list if it contains more than one filepath
+        if len(current_group) > 1:
+            word_groups.append(current_group)
+
+    return word_groups
+
 def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
 
     posprompt = False
@@ -58,11 +106,11 @@ def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
 
     #print(type(data_dict))
     if positivepromptarray != None :
-        print("Pos array is not empty.  Len is " + str(len(positivepromptarray)))
+        #print("Pos array is not empty.  Len is " + str(len(positivepromptarray)))
         posprompt = True
 
     if negativepromptarray != None :
-        print("neg array is not empty.  Len is " + str(len(negativepromptarray)))
+        #print("neg array is not empty.  Len is " + str(len(negativepromptarray)))
         negprompt = True
 
     for entry in data_dict:
@@ -128,7 +176,7 @@ def checkposandnegarrays(data_dict, positivepromptarray, negativepromptarray):
     #        print("Style has Empty negative prompt or negprompt is empty.  Will always be a match")
 
         if (pos or styleposprompt == '' ) and (neg or stylenegprompt == ''):
-            print("Neg and positive match for a style")
+            #print("Neg and positive match for a style")
             cntr += 1
             if pos:
                 #print("positive matches")
@@ -164,6 +212,11 @@ def extract_text_after2(list_obj, text):
         if element.strip().lower().startswith(text.lower() + ":"):
             return element.split(":")[-1].strip()
     return None
+
+def extract_between_angle_brackets(input_string):
+    pattern = re.compile(r'<(.*?)>')
+    matches = pattern.findall(input_string)
+    return matches
 
 def ensure_comma_before_lt(input_string):
     # Use a regular expression to match '<' not preceded by a comma
@@ -370,11 +423,16 @@ def main():
     global movefiles
     global moveiffilesover
     global log_file
+    global comparebymd5
+    global comparebytext
+    global comparebytextpercentage
+    global renamefiles
 
     # Create a dictionary to store file hashes and corresponding folders
     file_hash_to_folder = {}
     hash_to_files = {}
     hash_list = defaultdict(list)
+    new_array = defaultdict(list)
     pos_valuescount = []
     neg_valuescount = []
     neg_values = []
@@ -404,16 +462,6 @@ def main():
                             hasparameters = True
                             badfile = False
                             parameter = parameter.lower()
-                            template = None
-                            istemplate = False
-
-                            steps = properwaytogetPromptfield(parameter,"steps")
-                            if 'template:' in parameter:
-                                print("template\n" + parameter)
-                                istemplate = True
-                                #tem = getTemplate(parameter)
-                                template = properwaytogetPromptfield(parameter,"template")
-
                         else:
                             #print("PNG with no metadata")
                             try:
@@ -442,25 +490,19 @@ def main():
                # test = prompt_parser.parse_prompt_attention(parameter)
                # test2 = generation_parameters_copypaste.parse_generation_parameters(parameter)
 
-                model = ""
-                seed = ""
-                loras = ""
-                new_filename = ""
                 positiveprompt = ""
                 negativeprompt = ""
 
-                model = properwaytogetPromptfield(parameter,"model")
-                print ("model is " + model)
-                seed = properwaytogetPromptfield(parameter,"seed")
-                print("Seed is " + str(seed))
 
-                if istemplate == False:
-                    positivepromptarray = properwaytogetPromptfield(parameter,"")
+                loras = extract_between_angle_brackets(parameter)
+
+                if 'template:' in parameter:
+                    print("template\n" + parameter)
+                    positivepromptarray = properwaytogetPromptfield(parameter,"template")
                 else:
-                    positivepromptarray = template
-                negativepromptarray = properwaytogetPromptfield(parameter,"negative prompt")
+                    positivepromptarray = properwaytogetPromptfield(parameter,"")
 
-                loras = getloras(parameter)
+                negativepromptarray = properwaytogetPromptfield(parameter,"negative prompt")
 
                 if negativepromptarray != None:
                     negativepromptarray = sorted(negativepromptarray)
@@ -490,76 +532,84 @@ def main():
                     if negativepromptarray != None:
                         negativepromptarray = sorted(negativepromptarray)                    
                         negativeprompt = ','.join(negativepromptarray)
-                        #positiveprompt = posvalues.join(",")
-                        #negativeprompt = negvalues.join(",")
 
-                if model is not None:
-                    new_filename = model + '_'
-                else:
-                    new_filename = "nomodel_"
-
-                if seed is not None:
-                    new_filename = new_filename + seed  + '_'
-                else:
-                    new_filename = new_filename + "noseed_"
-
-
-                new_filename = new_filename + '_' + get_sanitized_download_time(file_path) + '_'
-                # os.path.splitext(filename)[1]
-
-                if loras != "":
-                    new_filename = new_filename + 'Loras_' + loras + '_'
-                #else:
-                #    print("uses no Loras")
-
-                new_filename = new_filename + os.path.splitext(filename)[1]
-                new_filename = sanitize_path_name(new_filename)
-                new_item_path = os.path.join(root, new_filename)
-
-                print(new_item_path)
-
-                if file_path not in new_item_path:
-                    try:
-                        shutil.move(file_path, new_item_path)
-                    except Exception as e:
-                        print(str(e))
-                else:
-                    print("doesn't need renaming.  Src and dest are the same: " + file_path + ' ' + new_item_path)
+                
 
                 if positiveprompt != "":
-                    # Use regular expressions to extract the 'parameter' section
-
                         write_to_log(log_file, new_item_path + " . " + positiveprompt)
 
                         # Calculate an MD5 hash of the section content
-                        section_hash = hashlib.md5(positiveprompt.encode()).hexdigest()
+                        if comparebymd5 == True:
+                            section_hash = hashlib.md5(positiveprompt.encode()).hexdigest()
 
-                        msg = new_item_path + " . " + section_hash
-                        print(msg)
-                        write_to_log(log_file, msg)
+                            msg = new_item_path + " . " + section_hash
+                            print(msg)
+                            write_to_log(log_file, msg)
 
-                        if section_hash in file_hash_to_folder:
-                            folder_name = file_hash_to_folder[section_hash]
-                        else:
-                            #new_uuid = uuid.uuid4()
-                            # Convert the UUID to a string
-                            #folder_name = str(new_uuid)
-                            folder_name = section_hash
-                            file_hash_to_folder[section_hash] = folder_name
+                            if section_hash in file_hash_to_folder:
+                                folder_name = file_hash_to_folder[section_hash]
+                            else:
+                                folder_name = section_hash
+                                file_hash_to_folder[section_hash] = folder_name
 
-                        #hash_list.append([section_hash, filename, new_item_path])
-                        hash_list[section_hash].append([new_filename, new_item_path])
+                            #hash_list.append([section_hash, filename, new_item_path])
+                            hash_list[section_hash].append([new_filename, new_item_path])
 
+                            if section_hash in hash_to_files:
+                                hash_to_files[section_hash].append(new_item_path)
+                            else:
+                                hash_to_files[section_hash] = [new_item_path]
 
-                        if section_hash in hash_to_files:
-                            hash_to_files[section_hash].append(new_item_path)
-                        else:
-                            hash_to_files[section_hash] = [new_item_path]
+                        elif comparebytext == True:
+                            new_array[new_item_path].append(positiveprompt)
+
+                if renamefiles == True:
+                    model = ""
+                    seed = ""
+                    loras = ""
+                    new_filename = ""
+                    steps = properwaytogetPromptfield(parameter,"steps")
+                    loras = getloras(parameter)
+
+                    model = properwaytogetPromptfield(parameter,"model")
+                    if model is not None:
+                        new_filename = model + '_'
+                        print ("model is " + model)
+                    else:
+                        new_filename = "nomodel_"
+
+                    seed = properwaytogetPromptfield(parameter,"seed")
+                    if seed is not None:
+                        print("Seed is " + str(seed))
+                        new_filename = new_filename + seed  + '_'
+                    else:
+                        new_filename = new_filename + "noseed_"
+
+                    new_filename = new_filename + '_' + get_sanitized_download_time(file_path) + '_'
+                    # os.path.splitext(filename)[1]
+
+                    if loras != "":
+                        new_filename = new_filename + 'Loras_' + loras + '_'
+                    #else:
+                    #    print("uses no Loras")
+
+                    new_filename = new_filename + os.path.splitext(filename)[1]
+                    new_filename = sanitize_path_name(new_filename)
+                    new_item_path = os.path.join(root, new_filename)
+
+                    print(new_item_path)
+
+                    if file_path not in new_item_path:
+                        try:
+                            shutil.move(file_path, new_item_path)
+                        except Exception as e:
+                            print(str(e))
+                    else:
+                        print("doesn't need renaming.  Src and dest are the same: " + file_path + ' ' + new_item_path)
 
             if badfile==True:
                     print(filename + " has no metadata.  Moving to nometa subdirectory")
                     move_to_subfolder(file_path,"nometa")
-
 
     if showcounts == True:
         value_counts = Counter(pos_valuescount)
@@ -604,42 +654,35 @@ def main():
                     csv_writer.writerow([content_hash, count, filename, full_path])
 
     if movefiles == True:
-        for hash, files in hash_to_files.items():
-                    if len(files) > moveiffilesover:
 
-                        for file_path in files:
-                        
-                        
-                            folder_name = os.path.join(os.path.dirname(file_path), hash)
-                            new_file_path = os.path.join( folder_name, os.path.basename(file_path))
-                                
-                            
-                            if hash in str(os.path.dirname(file_path)):
-                            #if hash in str(os.path.basename(file_path)) and hash in str(os.path.dirname(file_path)):
-                                print("Filename " +str(files) + " already in a directory containing the hash " + hash)
-                                continue
-                            else:
-                                if os.path.normpath(file_path) == os.path.normpath(new_file_path):
-                                    print("Already in correct location")
+        if comparebytext == True:
+            result = create_word_groups(new_array,comparebytextpercentage)
+            #looper = 0
+            for i, group in enumerate(result, start=1):
+                #looper +=1
+                print(f"Group {i}: {group}")
+                for each in group:
+                    move_to_subfolder(each,str(i))
+
+        elif comparebymd5 ==True:
+            for hash, files in hash_to_files.items():
+                        if len(files) > moveiffilesover:
+                            for file_path in files:
+                                folder_name = os.path.join(os.path.dirname(file_path), hash)
+                                new_file_path = os.path.join( folder_name, os.path.basename(file_path))
+                                if hash in str(os.path.dirname(file_path)):
+                                    print("Filename " +str(files) + " already in a directory containing the hash " + hash)
+                                    continue
                                 else:
-                                    os.makedirs(folder_name, exist_ok=True)
-                                    try:
-                                        os.rename(file_path, new_file_path)
-                                    except Exception as e:
-                                        print("oops " + str(e))
-                                    print(f"Moved: {file_path} to {new_file_path}")
-                #elif renamefiles == True:
-                #    for file_path in files:
-                #        if hash in str(file_path):
-                #            print("Filename " +str(files) + "already contains hash " + hash)
-                #            continue                    
-                #        new_file_path = os.path.join( os.path.dirname(file_path), hash + '_' + os.path.basename(file_path))
-                #        if file_path != new_file_path:
-                #            try:
-                #                os.rename(file_path, new_file_path)
-                #            except Exception as e:
-                #                print(str(e))
-
+                                    if os.path.normpath(file_path) == os.path.normpath(new_file_path):
+                                        print("Already in correct location")
+                                    else:
+                                        os.makedirs(folder_name, exist_ok=True)
+                                        try:
+                                            os.rename(file_path, new_file_path)
+                                        except Exception as e:
+                                            print("oops " + str(e))
+                                        print(f"Moved: {file_path} to {new_file_path}")
 
     print("Files have been organized into folders.")
 
@@ -649,7 +692,7 @@ def main():
 # Root directory to start the recursive search
 #root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/AmyWong'
 #root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/'
-root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/Gwendolyn Tennyson'
+root_directory = 'Z:/Pron/Pics/stable-diffusion/Sort/1/'
 #root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/Template 1girl,  glossy __ColorsBasic__  latex suit'
 #root_directory = 'Z:/Pron/Pics/stable-diffusion/Sort'
 #root_directory = 'W:/complete/ai'
@@ -660,7 +703,11 @@ readstyles = True
 showcounts = False
 writecsv = False
 movefiles = True
+renamefiles = False
 moveiffilesover = 1
+comparebymd5 = False
+comparebytext=True
+comparebytextpercentage=85
 
 
 main()
