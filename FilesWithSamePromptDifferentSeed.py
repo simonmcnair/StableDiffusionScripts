@@ -340,6 +340,25 @@ def getloras(parameter):
     else:
         return ""
 
+def substring(stringtosearch,start_substring,end_substring):
+
+    #start_substring = 'lora hashes: "'
+    #end_substring = '"'
+
+    start_index = stringtosearch.find(start_substring)
+    end_index = stringtosearch.find(end_substring, start_index + len(start_substring))
+
+    if start_index != -1 and end_index != -1:
+        result = stringtosearch[start_index + len(start_substring):end_index]
+        #print(result)
+    else:
+        return None
+        print("Substrings not found.")
+    
+    return result
+
+
+
 def write_to_log(log_file, message):
     try:
         with open(log_file, 'a') as file:
@@ -495,6 +514,21 @@ def main():
 
 
                 loras = extract_between_angle_brackets(parameter)
+                
+                if len(loras) > 0 :
+                    for lora in loras:
+                        print("lora name: " + lora)
+                        if 'lora hashes' in parameter:
+                            print("contains Lora Hashes")
+                            result =  substring(parameter,'lora hashes: "','"')
+                            allloras = result.split(",")
+                            for lor in allloras:
+                                lorarray = lor.split(": ")
+                                lorname = lorarray[0]
+                                lorhash = lorarray[1]
+                                print("found lora " + lorname + " with hash " + lorhash)
+
+                            #, adetailer version: 23.11.1, lora hashes: "add_detail: 7c6bad76eb54, add_detail: 7c6bad76eb54", ti hashes: "negative_hand-neg: 73b524a2da12", version: v1.7.0'
 
                 if 'template:' in parameter:
                     print("template\n" + parameter)
@@ -535,33 +569,7 @@ def main():
 
                 
 
-                if positiveprompt != "":
-                        write_to_log(log_file, new_item_path + " . " + positiveprompt)
 
-                        # Calculate an MD5 hash of the section content
-                        if comparebymd5 == True:
-                            section_hash = hashlib.md5(positiveprompt.encode()).hexdigest()
-
-                            msg = new_item_path + " . " + section_hash
-                            print(msg)
-                            write_to_log(log_file, msg)
-
-                            if section_hash in file_hash_to_folder:
-                                folder_name = file_hash_to_folder[section_hash]
-                            else:
-                                folder_name = section_hash
-                                file_hash_to_folder[section_hash] = folder_name
-
-                            #hash_list.append([section_hash, filename, new_item_path])
-                            hash_list[section_hash].append([new_filename, new_item_path])
-
-                            if section_hash in hash_to_files:
-                                hash_to_files[section_hash].append(new_item_path)
-                            else:
-                                hash_to_files[section_hash] = [new_item_path]
-
-                        elif comparebytext == True:
-                            new_array[new_item_path].append(positiveprompt)
 
                 if renamefiles == True:
                     model = ""
@@ -606,6 +614,39 @@ def main():
                             print(str(e))
                     else:
                         print("doesn't need renaming.  Src and dest are the same: " + file_path + ' ' + new_item_path)
+
+                    if positiveprompt != "":
+                            #write_to_log(log_file, new_item_path + " . " + positiveprompt)
+
+                            # Calculate an MD5 hash of the section content
+                            if comparebymd5 == True:
+                                section_hash = hashlib.md5(positiveprompt.encode()).hexdigest()
+
+                                msg = new_item_path + " . " + section_hash
+                                print(msg)
+                                write_to_log(log_file, msg)
+
+                                if section_hash in file_hash_to_folder:
+                                    folder_name = file_hash_to_folder[section_hash]
+                                else:
+                                    folder_name = section_hash
+                                    file_hash_to_folder[section_hash] = folder_name
+
+                                #hash_list.append([section_hash, filename, new_item_path])
+                                hash_list[section_hash].append([new_filename, new_item_path])
+
+                                if section_hash in hash_to_files:
+                                    hash_to_files[section_hash].append(new_item_path)
+                                else:
+                                    hash_to_files[section_hash] = [new_item_path]
+
+                            elif comparebytext == True:
+                                new_array[new_item_path].append(positiveprompt)
+
+
+
+
+
 
             if badfile==True:
                     print(filename + " has no metadata.  Moving to nometa subdirectory")
