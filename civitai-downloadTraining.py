@@ -5,7 +5,7 @@ import os
 def write_to_log(log_file, message):
     print(message)
     try:
-        with open(log_file, 'a') as file:
+        with open(log_file, 'a', encoding='utf-8') as file:
             file.write(message + '\n')
     except Exception as e:
         print(f"Error writing to the log file: {e}")
