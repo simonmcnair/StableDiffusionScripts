@@ -10,9 +10,7 @@ def write_to_log(log_file, message):
     except Exception as e:
         print(f"Error writing to the log file: {e}")
 
-
 def get_models():
-    all_ids = []
 
     # Initialize the first page
     page = 1
@@ -23,20 +21,25 @@ def get_models():
         params = {'page': page}
 
         while True:
-            #response = requests.get('https://civitai.com/api/v1/models?limit=3&types=LORA', headers=headers, params=params)
-            response = requests.get('https://civitai.com/api/v1/models?limit=100&types=LORA', headers=headers, params=params)
+            try:
+                response = requests.get('https://civitai.com/api/v1/models?limit=100&types=LORA', headers=headers, params=params)
+            except Exception as e:
+                 write_to_log(logfile_path, "Error " + str(e))
+
+            if "be back in a few minutes" in str(response.content):
+                print("error.  Site down")
+                exit()
+                
             if response.status_code == 200:
+                try:
+                    data = response.json()
+                except Exception as e:
+                    write_to_log(logfile_path, "Error " + str(e))
                 break
             else:
                  time.sleep(5)
                  write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
  
-        data = response.json()
-
-        #for each in data:
-        #    write_to_log(successfile_path, each.get('id'))
-        #    write_to_log(successfile_path, each.id)
-
         # Check if there are models in the response
         if 'items' in data:
             # Extract 'id' field from each model and add it to the list
@@ -93,15 +96,8 @@ def get_models():
         else:
             break
 
-    return all_ids
-
-
 download_to = 'Z:/Pics/stable-diffusion/Training & not SD/training by other/'
 
 logfile_path = os.path.join(download_to,'logfile.log')
 successfile_path = os.path.join(download_to,'successfile.log')
-# Example usage
-all_model_ids = get_models()
-
-# Print the result
-write_to_log(successfile_path, "Model IDs:", all_model_ids)
+get_models()
