@@ -29,7 +29,7 @@ def get_models():
                 break
             else:
                  time.sleep(5)
-                 write_to_log(successfile_path, "status code: " + str(response.status_code) + " " + response.reason)
+                 write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
  
         data = response.json()
 
@@ -40,12 +40,12 @@ def get_models():
         # Check if there are models in the response
         if 'items' in data:
             # Extract 'id' field from each model and add it to the list
-            write_to_log(successfile_path, "totalcnt = " + str(data['metadata'].get('totalItems')))
-            write_to_log(successfile_path, "page = " + str(data['metadata'].get('currentPage')) + " of " + str(data['metadata'].get('totalPages')))
+            write_to_log(logfile_path, "totalcnt = " + str(data['metadata'].get('totalItems')))
+            write_to_log(logfile_path, "page = " + str(data['metadata'].get('currentPage')) + " of " + str(data['metadata'].get('totalPages')))
             for each in data['items']:
                 id = each.get('id')
                 name = each.get('name')
-                write_to_log(successfile_path, "processing " + str(id) + f" ({name})")
+                write_to_log(logfile_path, "processing " + str(id) + f" ({name})")
 
  
                 for each1 in each['modelVersions']:
@@ -62,28 +62,28 @@ def get_models():
                             download_fullpath = os.path.join(download_to,downloadfilename)        
 
                             if not os.path.exists(download_fullpath):
-                                write_to_log(successfile_path, "downloading " + downloadurl + ".  Filename: " + downloadfilename + ". size: " + str(file.get('sizeKB')))
+                                write_to_log(logfile_path, "downloading " + downloadurl + ".  Filename: " + downloadfilename + ". size: " + str(file.get('sizeKB')))
                                 try:
                                     response = requests.get(downloadurl)
                                 except Exception as e:
-                                    write_to_log(successfile_path, "Error " + str(e))
+                                    write_to_log(logfile_path, "Error " + str(e))
 
 
                                 if response.status_code == 200:
                                     with open(download_fullpath, 'wb') as file2:
                                         file2.write(response.content)
-                                    write_to_log(successfile_path, f"File downloaded successfully to {download_fullpath}")
+                                    write_to_log(logfile_path, f"File downloaded successfully to {download_fullpath}")
 
                                     write_to_log(successfile_path, f"{model},{downloadurl},{downloadfilename}")
 
 
                                     # WRITE STUFF HERE
                                 else:
-                                    write_to_log(successfile_path, f"Failed to download file. Status code: {response.status_code}")
+                                    write_to_log(logfile_path, f"Failed to download file. Status code: {response.status_code}")
                             else:
-                                write_to_log(successfile_path, "file already exists")
+                                write_to_log(logfile_path, "file already exists")
                         else:
-                            write_to_log(successfile_path, "file type is" + f": {file.get('type')}.  Filename: {file.get('name')}")
+                            write_to_log(logfile_path, "file type is" + f": {file.get('type')}.  Filename: {file.get('name')}")
 
             # Check if there are more pages
             if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
