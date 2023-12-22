@@ -18,6 +18,14 @@ from nltk.corpus import stopwords
 nltk.download('punkt')
 nltk.download('stopwords')
 
+def write_to_log(log_file, message):
+    try:
+        with open(log_file, 'a', encoding='utf-8') as file:
+            file.write(message + '\n')
+    except Exception as e:
+        print(f"Error writing to the log file: {e}.  Press a key to continue")
+        input()
+
 def read_style_to_list(file_path):
     data_array = []
 
@@ -357,15 +365,6 @@ def substring(stringtosearch,start_substring,end_substring):
    
     return result
 
-
-
-def write_to_log(log_file, message):
-    try:
-        with open(log_file, 'a') as file:
-            file.write(message + '\n')
-    except Exception as e:
-        print(f"Error writing to the log file: {e}")
-
 def move_file_to_meta(filename, subfolder_name):
     file_location = os.path.dirname(filename)
     destination_folder = os.path.join(file_location, subfolder_name)
@@ -435,12 +434,14 @@ def move_to_subfolder(path, subfolder):
 def move_to_fixed_folder_with_group_number(path, filepath,groupid):
     # Check if the path is a directory or a file
 
+    global log_file
     dir = os.path.dirname(filepath)
     filename = os.path.basename(filepath)
     base_name, ext = os.path.splitext(filename)
 
-    destination = os.path.join(path,groupid + '_' + filename)
-
+    destination = os.path.join(path,groupid,groupid + '_' + filename)
+    path = os.path.join(path,groupid)
+    
     if not os.path.isdir(path):
         os.makedirs(path)
 
@@ -451,11 +452,11 @@ def move_to_fixed_folder_with_group_number(path, filepath,groupid):
             new_name = f"{groupid}_{base_name}_{count}{ext}"
             destination = os.path.join(path, new_name)
             count += 1
+        write_to_log(log_file,f"moving {filepath} to {destination}")
         shutil.move(filepath, destination)
     else:
+        write_to_log(log_file,f"moving {filepath} to {destination}")
         shutil.move(filepath, destination)
-
-
 
 
 def main():
@@ -470,6 +471,7 @@ def main():
     global comparebytext
     global comparebytextpercentage
     global renamefiles
+    global sorted_folder
 
     # Create a dictionary to store file hashes and corresponding folders
     file_hash_to_folder = {}
@@ -735,7 +737,7 @@ def main():
                     print("group " + str(i) + " of " + str(len(result)))
                     if len(group) > moveiffilesover:
                     #shouldn't need to do this.  why do I ?
-                        move_to_fixed_folder_with_group_number('Z:/Pron/Pics/stable-diffusion/Sort/Sorted/',each,str(i))
+                        move_to_fixed_folder_with_group_number(sorted_folder,each,str(i))
 
         elif comparebymd5 ==True:
             for hash, files in hash_to_files.items():
@@ -762,8 +764,12 @@ def main():
 
 
 
-root_directory = 'Z:/Pics/stable-diffusion/Sort/1/'
-stylefilepath = 'X:/dif/stable-diffusion-webui-docker/data/config/auto/styles.csv'
+root_directory = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt//Pics/stable-diffusion/Sort/1/'
+stylefilepath = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt/docker/stable-diffusion-webui-docker/data/config/auto/styles.csv'
+sorted_folder = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt//Pics/stable-diffusion/Sort/Sorted/'
+#root_directory = 'Z://Pics/stable-diffusion/Sort/1/'
+#stylefilepath = 'X:/dif/stable-diffusion-webui-docker/data/config/auto/styles.csv'
+#sorted_folder = 'Z://Pics/stable-diffusion/Sort/Sorted/'
 log_file = os.path.join(root_directory,"my_log.txt")
 
 readstyles = True
