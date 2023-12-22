@@ -53,7 +53,7 @@ def read_style_to_list(file_path):
 
     return data_array
 
-def create_word_groups(filepath_strings,percentagesimilar=90):
+def create_word_groups(filepath_strings,percentagesimilar=90,groupifover=1):
     word_groups = []
 
     # Convert the dictionary items to a list for easy iteration
@@ -90,7 +90,7 @@ def create_word_groups(filepath_strings,percentagesimilar=90):
                 i += 1
 
         # Add the current group to the list if it contains more than one filepath
-        if len(current_group) > 1:
+        if len(current_group) > groupifover:
             word_groups.append(current_group)
 
     return word_groups
@@ -352,9 +352,9 @@ def substring(stringtosearch,start_substring,end_substring):
         result = stringtosearch[start_index + len(start_substring):end_index]
         #print(result)
     else:
-        return None
         print("Substrings not found.")
-    
+        return None
+   
     return result
 
 
@@ -431,6 +431,30 @@ def move_to_subfolder(path, subfolder):
             dest_file = os.path.join(subfolder_path, new_name)
             count += 1
         shutil.move(path, dest_file)
+
+def move_to_fixed_folder_with_group_number(path, filepath,groupid):
+    # Check if the path is a directory or a file
+
+    dir = os.path.dirname(filepath)
+    filename = os.path.basename(filepath)
+    base_name, ext = os.path.splitext(filename)
+
+    destination = os.path.join(path,groupid + '_' + filename)
+
+    if not os.path.isdir(path):
+        os.makedirs(path)
+
+    if os.path.isfile(destination):
+        # Create the subfolder if it doesn't exist
+        count = 1
+        while os.path.exists(destination):
+            new_name = f"{groupid}_{base_name}_{count}{ext}"
+            destination = os.path.join(path, new_name)
+            count += 1
+        shutil.move(filepath, destination)
+    else:
+        shutil.move(filepath, destination)
+
 
 
 
@@ -518,8 +542,9 @@ def main():
                 if len(loras) > 0 :
                     for lora in loras:
                         print("lora name: " + lora)
-                        if 'lora hashes' in parameter:
-                            print("contains Lora Hashes")
+                        if 'lora hashes: "' in parameter:
+                            print("contains multiple Lora Hashes")
+                            
                             result =  substring(parameter,'lora hashes: "','"')
                             allloras = result.split(",")
                             for lor in allloras:
@@ -529,6 +554,19 @@ def main():
                                 print("found lora " + lorname + " with hash " + lorhash)
 
                             #, adetailer version: 23.11.1, lora hashes: "add_detail: 7c6bad76eb54, add_detail: 7c6bad76eb54", ti hashes: "negative_hand-neg: 73b524a2da12", version: v1.7.0'
+                        elif 'lora hashes: ' in parameter:
+                            print("contains single Lora Hash")
+                            
+                            result =  substring(parameter,'lora hashes: ',',')
+                            allloras = result.split(",")
+                            for lor in allloras:
+                                lorarray = lor.split(": ")
+                                lorname = lorarray[0]
+                                lorhash = lorarray[1]
+                                print("found lora " + lorname + " with hash " + lorhash)
+                        
+                        else:
+                            print("No Loras found")
 
                 if 'template:' in parameter:
                     print("template\n" + parameter)
@@ -566,10 +604,6 @@ def main():
                     if negativepromptarray != None:
                         negativepromptarray = sorted(negativepromptarray)                    
                         negativeprompt = ','.join(negativepromptarray)
-
-                
-
-
 
                 if renamefiles == True:
                     model = ""
@@ -643,11 +677,6 @@ def main():
                             elif comparebytext == True:
                                 new_array[new_item_path].append(positiveprompt)
 
-
-
-
-
-
             if badfile==True:
                     print(filename + " has no metadata.  Moving to nometa subdirectory")
                     move_to_subfolder(file_path,"nometa")
@@ -697,13 +726,16 @@ def main():
     if movefiles == True:
 
         if comparebytext == True:
-            result = create_word_groups(new_array,comparebytextpercentage)
+            result = create_word_groups(new_array,comparebytextpercentage,moveiffilesover)
             #looper = 0
             for i, group in enumerate(result, start=1):
                 #looper +=1
                 print(f"Group {i}: {group}")
                 for each in group:
-                    move_to_subfolder(each,str(i))
+                    print("group " + str(i) + " of " + str(len(result)))
+                    if len(group) > moveiffilesover:
+                    #shouldn't need to do this.  why do I ?
+                        move_to_fixed_folder_with_group_number('Z:/Pron/Pics/stable-diffusion/Sort/Sorted/',each,str(i))
 
         elif comparebymd5 ==True:
             for hash, files in hash_to_files.items():
@@ -730,13 +762,7 @@ def main():
 
 
 
-# Root directory to start the recursive search
-#root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/AmyWong'
-#root_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/'
-root_directory = 'Z:/Pron/Pics/stable-diffusion/Sort/1/'
-#root_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/Template 1girl,  glossy __ColorsBasic__  latex suit'
-#root_directory = 'Z:/Pron/Pics/stable-diffusion/Sort'
-#root_directory = 'W:/complete/ai'
+root_directory = 'Z:/Pics/stable-diffusion/Sort/1/'
 stylefilepath = 'X:/dif/stable-diffusion-webui-docker/data/config/auto/styles.csv'
 log_file = os.path.join(root_directory,"my_log.txt")
 
@@ -744,11 +770,11 @@ readstyles = True
 showcounts = False
 writecsv = False
 movefiles = True
-renamefiles = False
+renamefiles = True
 moveiffilesover = 1
 comparebymd5 = False
 comparebytext=True
-comparebytextpercentage=85
+comparebytextpercentage=90
 
 
 main()

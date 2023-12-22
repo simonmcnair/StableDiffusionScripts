@@ -5,7 +5,7 @@ import os
 def write_to_log(log_file, message):
     print(message)
     try:
-        with open(log_file, 'a') as file:
+        with open(log_file, 'a', encoding='utf-8') as file:
             file.write(message + '\n')
     except Exception as e:
         print(f"Error writing to the log file: {e}")
@@ -61,7 +61,7 @@ def get_models():
                             write_to_log(successfile_path, "found training data")
                             
                             downloadurl = file.get('downloadUrl')
-                            downloadfilename = file.get('name')
+                            downloadfilename = model + '_' + file.get('name')
                             download_fullpath = os.path.join(download_to,downloadfilename)        
 
                             if not os.path.exists(download_fullpath):
