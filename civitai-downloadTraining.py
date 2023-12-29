@@ -20,8 +20,8 @@ def get_models():
         # Make API request for the current page
         headers = {'Content-Type': 'application/json'}
 
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+#        if api_key:
+#            headers["Authorization"] = f"Bearer {api_key}"
 
         params = {'page': page}
 
@@ -34,6 +34,12 @@ def get_models():
             if "be back in a few minutes" in str(response.content):
                 print("error.  Site down")
                 exit()
+
+            if response.status_code == 401 and api_key:
+                # Retry the request with the API key
+                headers["Authorization"] = f"Bearer {api_key}"
+                response = requests.get('https://civitai.com/api/v1/models?limit=100&types=LORA', headers=headers, params=params)
+
                 
             if response.status_code == 200:
                 try:
@@ -78,16 +84,16 @@ def get_models():
                                 except Exception as e:
                                     write_to_log(logfile_path, "Error " + str(e))
 
+                                if response.status_code == 401 and api_key:
+                                    # Retry the request with the API key
+                                    headers["Authorization"] = f"Bearer {api_key}"
+                                    response = requests.get(downloadurl, headers=headers)
 
                                 if response.status_code == 200:
                                     with open(download_fullpath, 'wb') as file2:
                                         file2.write(response.content)
                                     write_to_log(logfile_path, f"File downloaded successfully to {download_fullpath}")
-
                                     write_to_log(successfile_path, f"{model},{downloadurl},{downloadfilename}")
-
-
-                                    # WRITE STUFF HERE
                                 else:
                                     write_to_log(logfile_path, f"Failed to download file. Status code: {response.status_code}")
                             else:
@@ -103,10 +109,8 @@ def get_models():
         else:
             break
 
-download_to = 'Z:/Pics/stable-diffusion/Training & not SD/training by other/'
+download_to = '/folder/to/download/to'
 
-logfile_path = os.path.join(download_to,'logfile.log')
-successfile_path = os.path.join(download_to,'successfile.log')
 
 apifile = os.path.join('.', "apikey.py")
 if os.path.exists(apifile):
@@ -119,10 +123,13 @@ else:
 localoverridesfile = os.path.join('.', "localoverridesfile.py")
 
 if os.path.exists(localoverridesfile):
-    exec(open(apifile).read())
+    exec(open(localoverridesfile).read())
     #api_key = apikey
     #print("API Key:", api_key)
 else:
     print("No local overrides.")
+
+logfile_path = os.path.join(download_to,'logfile.log')
+successfile_path = os.path.join(download_to,'successfile.log')
 
 get_models()
