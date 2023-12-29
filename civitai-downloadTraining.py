@@ -100,4 +100,13 @@ download_to = 'Z:/Pics/stable-diffusion/Training & not SD/training by other/'
 
 logfile_path = os.path.join(download_to,'logfile.log')
 successfile_path = os.path.join(download_to,'successfile.log')
+
+useapikey = True
+
+if useapikey == True:
+    apifile = os.path.join(download_to,"apikey.py")
+    if os.path.exists(apifile):
+        import apifile
+
+
 get_models()
