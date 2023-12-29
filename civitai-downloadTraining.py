@@ -12,12 +12,17 @@ def write_to_log(log_file, message):
 
 def get_models():
 
+    global api_key
     # Initialize the first page
     page = 1
 
     while True:
         # Make API request for the current page
         headers = {'Content-Type': 'application/json'}
+
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
         params = {'page': page}
 
         while True:
@@ -53,6 +58,7 @@ def get_models():
  
                 for each1 in each['modelVersions']:
                     model = each1.get('name')
+                    model_id = each1.get('id')
                         
                     for file in each1['files']:
                             
@@ -61,7 +67,8 @@ def get_models():
                             write_to_log(successfile_path, "found training data")
                             
                             downloadurl = file.get('downloadUrl')
-                            downloadfilename = model + '_' + file.get('name')
+                            #downloadfilename = name + '_' + model + '_' + file.get('name')
+                            downloadfilename = str(model_id) + '_' + str(file.get('id')) + '_' + file.get('name')
                             download_fullpath = os.path.join(download_to,downloadfilename)        
 
                             if not os.path.exists(download_fullpath):
@@ -101,12 +108,21 @@ download_to = 'Z:/Pics/stable-diffusion/Training & not SD/training by other/'
 logfile_path = os.path.join(download_to,'logfile.log')
 successfile_path = os.path.join(download_to,'successfile.log')
 
-useapikey = True
+apifile = os.path.join('.', "apikey.py")
+if os.path.exists(apifile):
+    exec(open(apifile).read())
+    api_key = apikey
+    print("API Key:", api_key)
+else:
+    print("apikey.py not found in the current directory.")
 
-if useapikey == True:
-    apifile = os.path.join(download_to,"apikey.py")
-    if os.path.exists(apifile):
-        import apifile
+localoverridesfile = os.path.join('.', "localoverridesfile.py")
 
+if os.path.exists(localoverridesfile):
+    exec(open(apifile).read())
+    #api_key = apikey
+    #print("API Key:", api_key)
+else:
+    print("No local overrides.")
 
 get_models()
