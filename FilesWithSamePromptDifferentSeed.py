@@ -75,7 +75,7 @@ def read_style_to_list(file_path):
 
     return data_array
 
-def create_word_groups_parallel(args):
+def create_word_groups_parallel_func(args):
     filepath_strings, start, end = args
     result_filepaths = []
 
@@ -155,7 +155,7 @@ def create_word_groups_parallel(filepath_strings, num_processes=4):
 
     with ProcessPoolExecutor(max_workers=num_processes) as executor:
         chunk_size = len(items) // num_processes
-        futures = [executor.submit(create_word_groups_parallel, (filepath_strings, i, i + chunk_size)) for i in range(0, len(items), chunk_size)]
+        futures = [executor.submit(create_word_groups_parallel_func, (filepath_strings, i, i + chunk_size)) for i in range(0, len(items), chunk_size)]
 
         for future in futures:
             word_groups.extend(future.result())
@@ -373,16 +373,16 @@ def properwaytogetPromptfield(mystr,fieldtoretrieve=''):
 
     return ret
 
-def sanitize_path_name(folder_name):
+def sanitise_path_name(folder_name):
     # Define a regular expression pattern to match invalid characters
-    invalid_chars_pattern = re.compile(r'[\\/:"*?<>|]')
+    invalid_chars_pattern = re.compile(r'[\\/:"*?<>| ]')
 
     # Replace invalid characters with an empty string
-    sanitized_folder_name = re.sub(invalid_chars_pattern, '', folder_name)
+    sanitised_folder_name = re.sub(invalid_chars_pattern, '', folder_name)
 
-    return sanitized_folder_name
+    return sanitised_folder_name
 
-def get_sanitized_download_time(filepath):
+def get_sanitised_download_time(filepath):
     # Get the modification time of the file
     mtime = os.path.getmtime(filepath)
     # Convert the modification time to a datetime object
@@ -390,13 +390,13 @@ def get_sanitized_download_time(filepath):
     # Format the datetime as a string in the format YYYY-MM-DD_HH-MM-SS
     dt_string = dt.strftime("%Y-%m-%d_%H-%M-%S")
     # Replace any spaces or colons with underscores
-    sanitized_dt_string = dt_string.replace(" ", "_").replace(":", "_")
-    # Return the sanitized datetime string
-    return sanitized_dt_string
+    sanitised_dt_string = dt_string.replace(" ", "_").replace(":", "_")
+    # Return the sanitised datetime string
+    return sanitised_dt_string
 
 def getloras(parameter):
 
-    matches = re.findall(r'lora:(.*?):', parameter)
+    matches = re.findall(r'<lora:(.*?):', parameter)
     Loras = '_'.join(set(matches))
 
     #Loras = '_'.join(matches)
@@ -428,7 +428,7 @@ def move_file_to_meta(filename, subfolder_name):
     file_location = os.path.dirname(filename)
     destination_folder = os.path.join(file_location, subfolder_name)
 
-    subfolder_name = sanitize_path_name(subfolder_name)
+    subfolder_name = sanitise_path_name(subfolder_name)
     if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
 
@@ -669,10 +669,8 @@ def main():
                 if renamefiles == True:
                     model = ""
                     seed = ""
-                    loras = ""
                     new_filename = ""
                     steps = properwaytogetPromptfield(parameter,"steps")
-                    loras = getloras(parameter)
 
                     model = properwaytogetPromptfield(parameter,"model")
                     if model is not None:
@@ -688,16 +686,18 @@ def main():
                     else:
                         new_filename = new_filename + "noseed_"
 
-                    new_filename = new_filename + '_' + get_sanitized_download_time(file_path) + '_'
+                    #new_filename = new_filename + '_' + get_sanitised_download_time(file_path) + '_'
                     # os.path.splitext(filename)[1]
 
+                    loras = ""
+                    loras = sanitise_path_name(getloras(parameter))                    
                     if loras != "":
                         new_filename = new_filename + 'Loras_' + loras + '_'
                     #else:
                     #    print("uses no Loras")
 
                     new_filename = new_filename + os.path.splitext(filename)[1]
-                    new_filename = sanitize_path_name(new_filename)
+                    new_filename = sanitise_path_name(new_filename)
                     new_item_path = os.path.join(root, new_filename)
 
                     print(new_item_path)
@@ -787,7 +787,7 @@ def main():
     if movefiles == True:
 
         if comparebytext == True:
-            result = create_word_groups(new_array,comparebytextpercentage,moveiffilesover)
+            #result = create_word_groups(new_array,comparebytextpercentage,moveiffilesover)
             #looper = 0
 
 #            for i, group in enumerate(result, start=1):
@@ -799,7 +799,8 @@ def main():
                     #shouldn't need to do this.  why do I ?
 #                        move_to_fixed_folder_with_group_number(sorted_folder,each,str(i))
 
-            word_groups = create_word_groups_parallel(result)
+            word_groups = create_word_groups(new_array)
+            #word_groups = create_word_groups_parallel(new_array)
             print("Word Groups:")
             for i, group in enumerate(word_groups, start=1):
                 for each in group:
