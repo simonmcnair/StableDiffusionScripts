@@ -839,6 +839,12 @@ moveiffilesover = 1
 comparebymd5 = False
 comparebytext=True
 comparebytextpercentage=90
+useapikey = True
+
+if useapikey == True:
+    apifile = os.path.join(root_directory,"apikey.py")
+    if os.path.exists(apifile):
+        import apifile
 
 
 main()
