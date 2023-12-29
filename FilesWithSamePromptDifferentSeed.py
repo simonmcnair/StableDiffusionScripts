@@ -12,7 +12,10 @@ import shutil
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+#python3.11 -m venv venv
+#source ./venv/bin/activate
 #pip install nltk
+#pip install pillow
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
