@@ -2,6 +2,11 @@ import requests
 import time
 import os
 
+def get_script_name():
+    # Use os.path.basename to get the base name (script name) from the full path
+    #basename = os.path.basename(path)
+    return os.path.basename(__file__)
+
 def write_to_log(log_file, message):
     print(message)
     try:
@@ -120,7 +125,7 @@ if os.path.exists(apifile):
 else:
     print("apikey.py not found in the current directory.")
 
-localoverridesfile = os.path.join('.', "localoverridesfile.py")
+localoverridesfile = os.path.join('.', "localoverridesfile_" + get_script_name + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())

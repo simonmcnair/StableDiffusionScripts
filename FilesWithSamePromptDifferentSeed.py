@@ -19,6 +19,12 @@ from nltk.corpus import stopwords
 nltk.download('punkt')
 nltk.download('stopwords')
 
+def get_script_name():
+    # Use os.path.basename to get the base name (script name) from the full path
+    #basename = os.path.basename(path)
+    return os.path.basename(__file__)
+
+
 def write_to_log(log_file, message):
     global debug
     if debug == True: print(message)
@@ -824,10 +830,7 @@ def main():
 root_directory = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt//Pics/stable-diffusion/Sort/1/'
 stylefilepath = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt/docker/stable-diffusion-webui-docker/data/config/auto/styles.csv'
 sorted_folder = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt//Pics/stable-diffusion/Sort/Sorted/'
-#root_directory = 'Z://Pics/stable-diffusion/Sort/1/'
-#stylefilepath = 'X:/dif/stable-diffusion-webui-docker/data/config/auto/styles.csv'
-#sorted_folder = 'Z://Pics/stable-diffusion/Sort/Sorted/'
-log_file = os.path.join(root_directory,"my_log.txt")
+
 
 readstyles = True
 showcounts = True
@@ -839,12 +842,23 @@ moveiffilesover = 1
 comparebymd5 = False
 comparebytext=True
 comparebytextpercentage=90
-useapikey = True
+useapikey = False
 
 if useapikey == True:
+    #unused here
     apifile = os.path.join(root_directory,"apikey.py")
     if os.path.exists(apifile):
         import apifile
 
+localoverridesfile = os.path.join('.', "localoverridesfile_" + get_script_name + '.py')
 
+if os.path.exists(localoverridesfile):
+    exec(open(localoverridesfile).read())
+    #api_key = apikey
+    #print("API Key:", api_key)
+else:
+    print("No local overrides.")
+
+
+log_file = os.path.join(root_directory,get_script_name + '.log')
 main()
