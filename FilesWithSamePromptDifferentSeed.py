@@ -9,6 +9,7 @@ import csv
 from collections import defaultdict
 from collections import Counter
 import shutil
+from concurrent.futures import ProcessPoolExecutor
 
 #pip install nltk
 import nltk
@@ -19,6 +20,8 @@ nltk.download('punkt')
 nltk.download('stopwords')
 
 def write_to_log(log_file, message):
+    global debug
+    if debug == True: print(message)
     try:
         with open(log_file, 'a', encoding='utf-8') as file:
             file.write(message + '\n')
@@ -61,6 +64,38 @@ def read_style_to_list(file_path):
 
     return data_array
 
+def create_word_groups_parallel(args):
+    filepath_strings, start, end = args
+    result_filepaths = []
+
+    # Convert the dictionary items to a list for easy iteration
+    items = list(filepath_strings.items())[start:end]
+
+    stop_words = set(stopwords.words('english'))
+
+    for i in range(len(items)):
+        current_filepath, current_string = items[i]
+
+        current_group = [current_filepath]
+        current_words = set(word_tokenize(current_string.lower())) - stop_words
+
+        for j in range(i + 1, len(items)):
+            compare_filepath, compare_string = items[j]
+            compare_words = set(word_tokenize(compare_string.lower())) - stop_words
+
+            # Calculate the percentage of common words
+            percentage_common = len(current_words.intersection(compare_words)) / max(len(current_words), len(compare_words)) * 100
+
+            # If over 90% of words are the same, add the filepath to the current group
+            if percentage_common > 90:
+                current_group.append(compare_filepath)
+
+        # Add the current group to the result if it contains more than one filepath
+        if len(current_group) > 1:
+            result_filepaths.append(current_group)
+
+    return result_filepaths
+
 def create_word_groups(filepath_strings,percentagesimilar=90,groupifover=1):
     word_groups = []
 
@@ -100,6 +135,19 @@ def create_word_groups(filepath_strings,percentagesimilar=90,groupifover=1):
         # Add the current group to the list if it contains more than one filepath
         if len(current_group) > groupifover:
             word_groups.append(current_group)
+
+    return word_groups
+
+def create_word_groups_parallel(filepath_strings, num_processes=4):
+    word_groups = []
+    items = list(filepath_strings.items())
+
+    with ProcessPoolExecutor(max_workers=num_processes) as executor:
+        chunk_size = len(items) // num_processes
+        futures = [executor.submit(create_word_groups_parallel, (filepath_strings, i, i + chunk_size)) for i in range(0, len(items), chunk_size)]
+
+        for future in futures:
+            word_groups.extend(future.result())
 
     return word_groups
 
@@ -711,7 +759,7 @@ def main():
     # Sort the list by content hash
     #hash_list.sort(key=lambda x: x[0])
     # Create a CSV file to store the results
-    if writecsv == True:
+    if writecsv == True and comparebymd5 ==True :
         csv_filename = os.path.join(root_directory, 'hash_results.csv')
         with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
             csv_writer = csv.writer(csv_file)
@@ -730,14 +778,23 @@ def main():
         if comparebytext == True:
             result = create_word_groups(new_array,comparebytextpercentage,moveiffilesover)
             #looper = 0
-            for i, group in enumerate(result, start=1):
+
+#            for i, group in enumerate(result, start=1):
                 #looper +=1
-                print(f"Group {i}: {group}")
-                for each in group:
-                    print("group " + str(i) + " of " + str(len(result)))
-                    if len(group) > moveiffilesover:
+#                print(f"Group {i}: {group}")
+#                for each in group:
+#                    print("group " + str(i) + " of " + str(len(result)))
+#                    if len(group) > moveiffilesover:
                     #shouldn't need to do this.  why do I ?
-                        move_to_fixed_folder_with_group_number(sorted_folder,each,str(i))
+#                        move_to_fixed_folder_with_group_number(sorted_folder,each,str(i))
+
+            word_groups = create_word_groups_parallel(result)
+            print("Word Groups:")
+            for i, group in enumerate(word_groups, start=1):
+                for each in group:
+                    print(f"Group {i}: {group}")
+                    move_to_fixed_folder_with_group_number(sorted_folder,each,str(i))
+                    
 
         elif comparebymd5 ==True:
             for hash, files in hash_to_files.items():
@@ -773,8 +830,9 @@ sorted_folder = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt/
 log_file = os.path.join(root_directory,"my_log.txt")
 
 readstyles = True
-showcounts = False
-writecsv = False
+showcounts = True
+writecsv = True
+debug = True
 movefiles = True
 renamefiles = True
 moveiffilesover = 1
