@@ -10,6 +10,7 @@ from collections import defaultdict
 from collections import Counter
 import shutil
 from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
 
 #pip install nltk
 import nltk
@@ -22,7 +23,8 @@ nltk.download('stopwords')
 def get_script_name():
     # Use os.path.basename to get the base name (script name) from the full path
     #basename = os.path.basename(path)
-    return os.path.basename(__file__)
+    return Path(__file__).stem
+    #return os.path.basename(__file__)
 
 
 def write_to_log(log_file, message):
@@ -827,9 +829,9 @@ def main():
 
 
 
-root_directory = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt//Pics/stable-diffusion/Sort/1/'
-stylefilepath = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt/docker/stable-diffusion-webui-docker/data/config/auto/styles.csv'
-sorted_folder = '/srv/dev-disk-by-uuid-342ac512-ae09-47a7-842f-d3158537d395/mnt//Pics/stable-diffusion/Sort/Sorted/'
+root_directory = '/file/to/sort/'
+stylefilepath = '/path/to/styles.csv'
+sorted_folder = 'file/to/Sorted/'
 
 
 readstyles = True
@@ -850,7 +852,7 @@ if useapikey == True:
     if os.path.exists(apifile):
         import apifile
 
-localoverridesfile = os.path.join('.', "localoverridesfile_" + get_script_name + '.py')
+localoverridesfile = os.path.join('.', "localoverridesfile_" + get_script_name() + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
@@ -860,5 +862,5 @@ else:
     print("No local overrides.")
 
 
-log_file = os.path.join(root_directory,get_script_name + '.log')
+log_file = os.path.join(root_directory,get_script_name() + '.log')
 main()
