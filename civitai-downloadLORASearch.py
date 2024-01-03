@@ -21,6 +21,7 @@ def write_to_log(log_file, message):
 def get_models():
 
     global api_key
+    global DownloadLORASearch
     # Initialize the first page
     page = 1
 
@@ -35,7 +36,8 @@ def get_models():
 
         while True:
             try:
-                response = requests.get('https://civitai.com/api/v1/models?limit=100&types=LORA', headers=headers, params=params)
+                est = f'https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}'
+                response = requests.get(f"https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}", headers=headers, params=params)
             except Exception as e:
                  write_to_log(logfile_path, "Error " + str(e))
 
@@ -46,7 +48,7 @@ def get_models():
             if response.status_code == 401 and api_key:
                 # Retry the request with the API key
                 headers["Authorization"] = f"Bearer {api_key}"
-                response = requests.get('https://civitai.com/api/v1/models?limit=100&types=LORA', headers=headers, params=params)
+                response = requests.get(f"https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}", headers=headers, params=params)
 
                 
             if response.status_code == 200:
@@ -76,9 +78,9 @@ def get_models():
                         
                     for file in each1['files']:
                             
-                        if file.get('type') =="Training Data":
+                        if file.get('type') =="LORA":
                             
-                            write_to_log(successfile_path, "found training data")
+                            write_to_log(successfile_path, "found LORA")
                             
                             downloadurl = file.get('downloadUrl')
                             #downloadfilename = name + '_' + model + '_' + file.get('name')
@@ -118,6 +120,7 @@ def get_models():
             break
 
 download_to = '/folder/to/download/to'
+DownloadLORASearch = 'shego'
 
 
 apifile = os.path.join(get_script_path(), "apikey.py")
