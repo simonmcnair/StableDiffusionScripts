@@ -29,6 +29,9 @@ def get_script_name():
     return Path(__file__).stem
     #return os.path.basename(__file__)
 
+def get_script_path():
+    return os.path.dirname(os.path.realpath(__file__))
+
 
 def write_to_log(log_file, message):
     global debug
@@ -865,7 +868,7 @@ def main():
 
 root_directory = '/file/to/sort/'
 stylefilepath = '/path/to/styles.csv'
-sorted_folder = 'file/to/Sorted/'
+sorted_folder = '/file/to/Sorted/'
 
 
 readstyles = True
@@ -886,7 +889,7 @@ if useapikey == True:
     if os.path.exists(apifile):
         import apifile
 
-localoverridesfile = os.path.join('.', "localoverridesfile_" + get_script_name() + '.py')
+localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
