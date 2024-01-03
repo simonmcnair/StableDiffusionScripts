@@ -161,7 +161,7 @@ def get_models():
             break
 
 Lora_download_to = '/folder/to/download/to'
-DownloadLORASearch = 'parr'
+DownloadLORASearch = 'Lora to search for'
 
 
 apifile = os.path.join(get_script_path(), "apikey.py")
