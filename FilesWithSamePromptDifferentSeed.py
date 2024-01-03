@@ -885,7 +885,7 @@ useapikey = False
 
 if useapikey == True:
     #unused here
-    apifile = os.path.join(root_directory,"apikey.py")
+    apifile = os.path.join(get_script_path(),"apikey.py")
     if os.path.exists(apifile):
         import apifile
 
@@ -899,5 +899,5 @@ else:
     print("No local overrides.")
 
 
-log_file = os.path.join(root_directory,get_script_name() + '.log')
+log_file = os.path.join(get_script_path(),get_script_name() + '.log')
 main()
