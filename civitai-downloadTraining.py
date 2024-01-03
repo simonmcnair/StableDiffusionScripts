@@ -1,11 +1,25 @@
 import requests
 import time
 import os
+from pathlib import Path
+import json
+
+def dump_to_json(data, filename):
+    """
+    Dump a Python object to a JSON file.
+
+    Parameters:
+    - data: Python object to be dumped to JSON.
+    - filename: Name of the JSON file to be created.
+    """
+    with open(filename, 'w') as json_file:
+        json.dump(data, json_file, indent=2)  # indent for pretty formatting (optional)
 
 def get_script_name():
     # Use os.path.basename to get the base name (script name) from the full path
     #basename = os.path.basename(path)
-    return os.path.basename(__file__)
+    return Path(__file__).stem
+    #return os.path.basename(__file__)
 
 def get_script_path():
     return os.path.dirname(os.path.realpath(__file__))

@@ -1,11 +1,35 @@
 import requests
 import time
 import os
+import json
+import re
+
+from pathlib import Path
+
+def sanitise_folder_name(folder_name):
+    # Define a regular expression pattern to match invalid characters
+    invalid_chars_pattern = re.compile(r'[\\/:"*?<>|]')
+
+    # Replace invalid characters with an empty string
+    sanitised_folder_name = re.sub(invalid_chars_pattern, '', folder_name)
+
+    return sanitised_folder_name
+
+def sanitise_filepath(filepath):
+    # Define the set of invalid characters in Windows and Linux file paths
+    filepath = filepath.replace('\\','/')
+    invalid_characters = set(['<', '>', '"', '\\','|', '?', '*',' '])
+
+    # Replace or remove invalid characters
+    sanitised_filepath = ''.join(char if char not in invalid_characters else '_' for char in filepath)
+
+    return sanitised_filepath
 
 def get_script_name():
     # Use os.path.basename to get the base name (script name) from the full path
     #basename = os.path.basename(path)
-    return os.path.basename(__file__)
+    return Path(__file__).stem
+    #return os.path.basename(__file__)
 
 def get_script_path():
     return os.path.dirname(os.path.realpath(__file__))
@@ -18,6 +42,17 @@ def write_to_log(log_file, message):
     except Exception as e:
         print(f"Error writing to the log file: {e}")
 
+def dump_to_json(data, filename):
+    """
+    Dump a Python object to a JSON file.
+
+    Parameters:
+    - data: Python object to be dumped to JSON.
+    - filename: Name of the JSON file to be created.
+    """
+    with open(filename, 'w') as json_file:
+        json.dump(data, json_file, indent=2)  # indent for pretty formatting (optional)
+
 def get_models():
 
     global api_key
@@ -28,16 +63,12 @@ def get_models():
     while True:
         # Make API request for the current page
         headers = {'Content-Type': 'application/json'}
-
-#        if api_key:
-#            headers["Authorization"] = f"Bearer {api_key}"
-
         params = {'page': page}
 
         while True:
             try:
                 est = f'https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}'
-                response = requests.get(f"https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}", headers=headers, params=params)
+                response = requests.get(f'https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}', headers=headers, params=params)
             except Exception as e:
                  write_to_log(logfile_path, "Error " + str(e))
 
@@ -48,7 +79,7 @@ def get_models():
             if response.status_code == 401 and api_key:
                 # Retry the request with the API key
                 headers["Authorization"] = f"Bearer {api_key}"
-                response = requests.get(f"https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}", headers=headers, params=params)
+                response = requests.get(f'https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}', headers=headers, params=params)
 
                 
             if response.status_code == 200:
@@ -78,17 +109,25 @@ def get_models():
                         
                     for file in each1['files']:
                             
-                        if file.get('type') =="LORA":
+                        if file.get('type') =="Model":
                             
                             write_to_log(successfile_path, "found LORA")
                             
                             downloadurl = file.get('downloadUrl')
+
+                            destination_folder = sanitise_filepath(os.path.join(Lora_download_to,DownloadLORASearch))
                             #downloadfilename = name + '_' + model + '_' + file.get('name')
-                            downloadfilename = str(model_id) + '_' + str(file.get('id')) + '_' + file.get('name')
-                            download_fullpath = os.path.join(download_to,downloadfilename)        
+                            download_filename = str(model_id) + '_' + str(file.get('id')) + '_' + file.get('name')
+                            download_fullpath = sanitise_filepath(os.path.join(destination_folder,download_filename))
+
+                            downloadJSON_filename = str(model_id) + '_' + str(file.get('id')) + '_' + file.get('name') + '.json'
+                            downloadJSON_fullpath = sanitise_filepath(os.path.join(destination_folder,downloadJSON_filename))
+
+                            if not os.path.exists(destination_folder):
+                                os.makedirs(destination_folder)
 
                             if not os.path.exists(download_fullpath):
-                                write_to_log(logfile_path, "downloading " + downloadurl + ".  Filename: " + downloadfilename + ". size: " + str(file.get('sizeKB')))
+                                write_to_log(logfile_path, "downloading " + downloadurl + ".  Filename: " + download_filename + ". size: " + str(file.get('sizeKB')))
                                 try:
                                     response = requests.get(downloadurl)
                                 except Exception as e:
@@ -102,8 +141,10 @@ def get_models():
                                 if response.status_code == 200:
                                     with open(download_fullpath, 'wb') as file2:
                                         file2.write(response.content)
+
+                                    dump_to_json(each1,downloadJSON_fullpath)
                                     write_to_log(logfile_path, f"File downloaded successfully to {download_fullpath}")
-                                    write_to_log(successfile_path, f"{model},{downloadurl},{downloadfilename}")
+                                    write_to_log(successfile_path, f"{model},{downloadurl},{download_filename}")
                                 else:
                                     write_to_log(logfile_path, f"Failed to download file. Status code: {response.status_code}")
                             else:
@@ -119,8 +160,8 @@ def get_models():
         else:
             break
 
-download_to = '/folder/to/download/to'
-DownloadLORASearch = 'shego'
+Lora_download_to = '/folder/to/download/to'
+DownloadLORASearch = 'parr'
 
 
 apifile = os.path.join(get_script_path(), "apikey.py")
@@ -140,7 +181,7 @@ if os.path.exists(localoverridesfile):
 else:
     print("No local overrides.")
 
-logfile_path = os.path.join(download_to,'logfile.log')
-successfile_path = os.path.join(download_to,'successfile.log')
+logfile_path = os.path.join(Lora_download_to,'logfile.log')
+successfile_path = os.path.join(Lora_download_to,'successfile.log')
 
 get_models()
