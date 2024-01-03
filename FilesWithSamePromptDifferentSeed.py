@@ -40,6 +40,26 @@ def write_to_log(log_file, message):
         print(f"Error writing to the log file: {e}.  Press a key to continue")
         input()
 
+def find_highest_numbered_folder(directory):
+    try:
+        # List all directories in the specified path
+        subdirectories = [d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))]
+
+        # Extract numeric parts and convert to integers
+        numeric_parts = [int(''.join(filter(str.isdigit, d))) for d in subdirectories]
+
+        if numeric_parts:
+            # Find the highest number
+            highest_number = max(numeric_parts)
+            return os.path.join(directory, f"folder{highest_number}")  # Modify the format as needed
+        else:
+            return 0  # No numbered folders found
+
+    except OSError as e:
+        print(f"Error: {e}")
+        return None
+
+
 def read_style_to_list(file_path):
     data_array = []
 
@@ -547,6 +567,8 @@ def main():
         else:
             readstyles = False
 
+    foldercnt = find_highest_numbered_folder(sorted_folder)
+
     counter = 0
     # Iterate through all files in the root_directory and its subdirectories
     for root, dirs, files in os.walk(root_directory):
@@ -805,7 +827,11 @@ def main():
             for i, group in enumerate(word_groups, start=1):
                 for each in group:
                     print(f"Group {i}: {group}")
-                    move_to_fixed_folder_with_group_number(sorted_folder,each,str(i))
+                    if foldercnt is not None:
+                        final = foldercnt + i
+                    else:
+                        final = i
+                    move_to_fixed_folder_with_group_number(sorted_folder,each,str(final))
                     
 
         elif comparebymd5 ==True:
