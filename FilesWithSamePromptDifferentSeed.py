@@ -45,13 +45,15 @@ def find_highest_numbered_folder(directory):
         # List all directories in the specified path
         subdirectories = [d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))]
 
+        numeric_parts = [int(''.join(filter(str.isdigit, d))) for d in subdirectories if d.isdigit()]
+        #numeric_parts = [d for d in subdirectories if d.isdigit()]
         # Extract numeric parts and convert to integers
-        numeric_parts = [int(''.join(filter(str.isdigit, d))) for d in subdirectories]
+        #numeric_parts = [int(''.join(filter(str.isdigit, d))) for d in subdirectories]
 
         if numeric_parts:
             # Find the highest number
             highest_number = max(numeric_parts)
-            return os.path.join(directory, f"folder{highest_number}")  # Modify the format as needed
+            return highest_number
         else:
             return 0  # No numbered folders found
 
