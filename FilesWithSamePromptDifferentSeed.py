@@ -132,7 +132,46 @@ def create_word_groups_parallel_func(args):
 
     return result_filepaths
 
-def create_word_groups(filepath_strings,percentagesimilar=90,groupifover=1):
+def create_word_groupsbywords(filepath_strings, max_different_words=1, group_if_over=1):
+    word_groups = []
+
+    # Convert the dictionary items to a list for easy iteration
+    items = list(filepath_strings.items())
+
+    while items:
+        current_filepath, current_string = items.pop(0)
+
+        current_group = [current_filepath]
+        current_words = set(word_tokenize(current_string[0].lower()))
+
+        i = 0
+        while i < len(items):
+            print(str(i) + " of " + str(len(items)))
+            compare_filepath, compare_string = items[i]
+            compare_words = set(word_tokenize(compare_string[0].lower()))
+
+            # Remove stop words (optional)
+            stop_words = set(stopwords.words('english'))
+            current_words = current_words - stop_words
+            compare_words = compare_words - stop_words
+
+            # Calculate the number of different words
+            different_words = len(current_words.symmetric_difference(compare_words))
+
+            # If the number of different words is less than or equal to the specified value, add the filepath to the current group
+            if different_words <= max_different_words:
+                current_group.append(compare_filepath)
+                items.pop(i)  # Remove the compared item from the list
+            else:
+                i += 1
+
+        # Add the current group to the list if it contains more than one filepath
+        if len(current_group) > group_if_over:
+            word_groups.append(current_group)
+
+    return word_groups
+
+def create_word_groups_precentage(filepath_strings,percentagesimilar=90,groupifover=1):
     word_groups = []
 
     # Convert the dictionary items to a list for easy iteration
@@ -828,7 +867,7 @@ def main():
                     #shouldn't need to do this.  why do I ?
 #                        move_to_fixed_folder_with_group_number(sorted_folder,each,str(i))
 
-            word_groups = create_word_groups(new_array)
+            word_groups = create_word_groups_precentage(new_array)
             #word_groups = create_word_groups_parallel(new_array)
             print("Word Groups:")
             for i, group in enumerate(word_groups, start=1):
