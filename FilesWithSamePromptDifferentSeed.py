@@ -553,6 +553,8 @@ def main():
     global comparebytextpercentage
     global renamefiles
     global sorted_folder
+    global root_directory
+    global stylefilepath
 
     # Create a dictionary to store file hashes and corresponding folders
     file_hash_to_folder = {}
