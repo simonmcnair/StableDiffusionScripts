@@ -25,13 +25,8 @@ def sort_file_by_first_letter(input_file, output_file):
             outfile.writelines(sorted_lines)
 
 # Example usage
-#basefolder = 'C:/Users/Simon/Desktop/'
 basefolder = 'X:/dif/stable-diffusion-webui-docker/data/config/auto/extensions/sd-dynamic-prompts/wildcards'
-#filename = 'photography-angles.txt'  # Replace with your input file name
 
-#path = os.path.join(basefolder,filename)
-
-#sort_file_by_first_letter(path, path)
 while True:
 
     user_input = input("Are you sure you want to alphabetically sort the files in the directory " + basefolder + "  (y/n): " ).lower()

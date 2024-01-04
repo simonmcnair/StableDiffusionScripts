@@ -182,6 +182,7 @@ else:
     print("No local overrides.")
 
 logfile_path = os.path.join(Lora_download_to,'logfile.log')
+
 successfile_path = os.path.join(Lora_download_to,'successfile.log')
 
 get_models()

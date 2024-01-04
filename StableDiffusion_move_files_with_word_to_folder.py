@@ -1,8 +1,18 @@
 import os
 import shutil
 from PIL import Image
+from pathlib import Path
 
 import re
+
+def get_script_name():
+    # Use os.path.basename to get the base name (script name) from the full path
+    #basename = os.path.basename(path)
+    return Path(__file__).stem
+    #return os.path.basename(__file__)
+
+def get_script_path():
+    return os.path.dirname(os.path.realpath(__file__))
 
 def sanitize_folder_name(folder_name):
     # Define a regular expression pattern to match invalid characters
@@ -114,17 +124,27 @@ def search_and_move_files(directory, search_string, dest=False, ):
             #if search_string in contents:
                 
 
-# Directory to search
-#search_directory = 'Z:/docker/stable-diffusion-webui-docker/output/txt2img'
-#search_directory = 'Z:/Pron/Pics/stable-diffusion/consolidated/Gwendolyn Tennyson/1'
-#search_directory = 'Z:/Pron/Pics/stable-diffusion/Sort/1/'
-#destination = 'Z:/Pron/Pics/stable-diffusion/Sort/'
-search_directory =  'Z:/Pron/Pics/stable-diffusion/consolidated/Gwendolyn_Tennyson/3/'
-destination =  'Z:/Pron/Pics/stable-diffusion/consolidated/Gwendolyn_Tennyson/Gwen_from_ben10_lora_notrigger/'
+apifile = os.path.join(get_script_path(), "apikey.py")
+if os.path.exists(apifile):
+    exec(open(apifile).read())
+    api_key = apikey
+    print("API Key:", api_key)
+else:
+    print("apikey.py not found in the current directory.")
 
-#search_directory = 'X:/dif/stable-diffusion-webui-docker/output/txt2img/Newfolder'
-# String to search for
-#search_string = 'Gwen|gwen_tennyson|gwendolyn_tennyson'
-search_string = 'Gwen-10'
+localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
+
+if os.path.exists(localoverridesfile):
+    exec(open(localoverridesfile).read())
+    #api_key = apikey
+    #print("API Key:", api_key)
+else:
+    print("No local overrides.")
+
+# Directory to search
+search_directory =  '/path/to/search'
+destination =  '/folder/to/move/to'
+
+search_string = 'searchterm'
 
 search_and_move_files(search_directory, search_string, destination)
