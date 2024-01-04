@@ -124,6 +124,11 @@ def search_and_move_files(directory, search_string, dest=False, ):
             #if search_string in contents:
                 
 
+# Directory to search
+search_directory =  '/path/to/search'
+destination =  '/folder/to/move/to'
+search_string = 'searchterm'
+
 apifile = os.path.join(get_script_path(), "apikey.py")
 if os.path.exists(apifile):
     exec(open(apifile).read())
@@ -140,11 +145,5 @@ if os.path.exists(localoverridesfile):
     #print("API Key:", api_key)
 else:
     print("No local overrides.")
-
-# Directory to search
-search_directory =  '/path/to/search'
-destination =  '/folder/to/move/to'
-
-search_string = 'searchterm'
 
 search_and_move_files(search_directory, search_string, destination)
