@@ -548,8 +548,9 @@ else:
 
             fullpath = os.path.join(defaultdir,filename)
             result = image_to_wd14_tags(fullpath)
-            result = result[1].replace(', ',',').replace(' ,',',')
-            result = result.split(',')
+            result2 = result[1]
+            result2 = result2.replace(', ',',').replace(' ,',',')
+            result2 = result2.split(',')
             print("hi")
             print(fullpath)
             print(str(result))
