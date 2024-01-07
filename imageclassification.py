@@ -499,7 +499,10 @@ class ImageTextDisplay:
 
         # Update the display
         self.show_current()
-        
+
+gui = True
+defaultdir = '/folder/to/process'
+
 localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
 
 if os.path.exists(localoverridesfile):
@@ -509,20 +512,34 @@ if os.path.exists(localoverridesfile):
 else:
     print("No local overrides.")
 
-defaultdir = '/folder/to/process'
 
 print("loading models")
 model = ResNet50(weights='imagenet')
 nltk.download('wordnet')
 print("models loaded")
 
-#photo = None
-root = tk.Tk()
-root.title("Image Text Display")
+if gui == True:
+    #photo = None
+    root = tk.Tk()
+    root.title("Image Text Display")
 
-# Creating an instance of ImageTextDisplay
-app = ImageTextDisplay(root)
+    # Creating an instance of ImageTextDisplay
+    app = ImageTextDisplay(root)
 
-# Start the main event loop
-root.mainloop()
+    # Start the main event loop
+    root.mainloop()
+
+else:
+    for root, dirs, files in os.walk(defaultdir):
+        for filename in files:
+
+            fullpath = os.path.join(defaultdir,filename)
+            result = image_to_wd14_tags(fullpath)
+            result = result.replace(', ',',').replace(' ,',',')
+            result = result.split(',')
+            print("hi")
+            print(fullpath)
+            print(str(result))
+            modify_exif_tags(fullpath, result, 'add')
+
 
