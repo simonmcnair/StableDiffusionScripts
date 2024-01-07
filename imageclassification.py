@@ -545,7 +545,7 @@ if gui == True:
 else:
     for root, dirs, files in os.walk(defaultdir):
         for filename in files:
-            if 'jpg' in filename or 'jpeg' in filename:
+            if filename.lower().endswith(('.jpg', '.jpeg')):
                 fullpath = os.path.join(defaultdir,filename)
                 result = image_to_wd14_tags(fullpath)
                 result2 = result[1]
