@@ -45,6 +45,18 @@ def get_script_name():
 def get_script_path():
     return os.path.dirname(os.path.realpath(__file__))
 
+def prepend_string_to_filename(fullpath, prefix):
+    # Split the full path into directory and filename
+    directory, filename = os.path.split(fullpath)
+
+    # Prepend the prefix to the filename
+    new_filename = f"{prefix}{filename}"
+
+    # Join the directory and the new filename to get the updated full path
+    new_fullpath = os.path.join(directory, new_filename)
+
+    return new_fullpath
+
 def modify_exif_tags(filename, tags, command, new_value=None):
     # Check if the file exists
     if os.path.exists(filename):
@@ -158,6 +170,7 @@ def load_image_in_thread(image_path):
         image1 = Image.open(image_path).resize((400, 300), Image.LANCZOS)
     except Exception as e:
         print(f'{e}')
+        prepend_string_to_filename(image_path,'corrupt_')
         return None
 
     return ImageTk.PhotoImage(image1)
@@ -549,6 +562,7 @@ else:
         for filename in files:
             if filename.lower().endswith(('.jpg', '.jpeg')):
                 fullpath = os.path.join(defaultdir,filename)
+                print("processing " + fullpath)
                 result = image_to_wd14_tags(fullpath)
                 result2 = result[1]
                 #result2 = result2.replace(', ',',').replace(' ,',',')
