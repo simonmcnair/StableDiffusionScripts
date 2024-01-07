@@ -340,7 +340,7 @@ def image_to_wd14_tags(filename) \
         print("image: " + filename + " successfully opened.  Continue processing ")
     except Exception as e:
         print("Processfile Exception1: " + " failed to open image : " + filename + ". FAILED Error: " + str(e) + ".  Skipping")
-        return False
+        return None
 
     try:
         model = WAIFU_MODELS['wd14-vit-v2']
@@ -364,6 +364,7 @@ def image_to_wd14_tags(filename) \
         return ratings, text_items, filtered_tags
     except Exception as e:
         print("Exception getting tags from image " + filename + ". " + str(e))
+        return None
 
 class ImageTextDisplay:
     def __init__(self, root):
@@ -466,14 +467,15 @@ class ImageTextDisplay:
 
                 #self.root.update_idletasks()  # Update the Tkinter GUI
                 result = image_to_wd14_tags(image_path)
-                text_set = result[1]
+                if result is not None:
+                    text_set = result[1]
 
-                # Display text
-                text_list = list(text_set)
-                self.text_str = ", ".join(text_list)
-                self.text_var.set(self.text_str)
-                if self.auto == True:
-                    self.apply_interrogation()
+                    # Display text
+                    text_list = list(text_set)
+                    self.text_str = ", ".join(text_list)
+                    self.text_var.set(self.text_str)
+                    if self.auto == True:
+                        self.apply_interrogation()
             else:
                 print("image was corrupt")
             # Preload the next image in the background
