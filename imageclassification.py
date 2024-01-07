@@ -554,6 +554,7 @@ else:
             print("hi")
             print(fullpath)
             print(str(result))
-            modify_exif_tags(fullpath, result2, 'add')
+            if result2 is not None:
+                modify_exif_tags(fullpath, result2, 'add')
 
 
