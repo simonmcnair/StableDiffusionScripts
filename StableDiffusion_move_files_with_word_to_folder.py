@@ -73,9 +73,24 @@ def move_file_to_fixedfolder(filename, folder,keyword):
         print(f"Error moving '{filename}' to '{destination}': {str(e)}")
 
 # Search for files containing a specific string
-def search_and_move_files(directory, search_string, dest=False, ):
+def search_and_move_files(directory, search_string, foldername,dest=False, ):
     movetosubfolder = False
     movetofixedfolder = False
+
+    if isinstance(search_string, str):
+        print("It's a string!")
+        if ',' in search_string:
+           terms = search_string.split(',')
+        else:
+           terms = list(search_string)
+    elif isinstance(search_string, dict):
+        print("It's a dictionary!")
+        return None
+        # Perform dictionary-related actions
+    elif isinstance(search_string, list):
+        print("It's a list!")
+        terms = search_string
+
     if dest == False:
         movetosubfolder = True
     else:
@@ -103,15 +118,15 @@ def search_and_move_files(directory, search_string, dest=False, ):
                         badfile = True
 
             if hasparameters ==True:
-                if search_string.lower() in parameter:
+                if any(terms) in parameter:
                     print(parameter)
                     print(f"Found '{search_string}' in: {file_path}")
                     #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
                     #if user_input == 'y':
                     if movetosubfolder == True:
-                        move_file_to_subfolder(file_path, search_string)
+                        move_file_to_subfolder(file_path, foldername)
                     if movetofixedfolder ==True:
-                        move_file_to_fixedfolder(file_path,dest ,search_string)
+                        move_file_to_fixedfolder(file_path,dest ,foldername)
                 else:
                     print(search_string + " not found in " + file_path)
 
@@ -128,6 +143,7 @@ def search_and_move_files(directory, search_string, dest=False, ):
 search_directory =  '/path/to/search'
 destination =  '/folder/to/move/to'
 search_string = 'searchterm'
+search_term_folder = 'foldertogroupunder'
 
 apifile = os.path.join(get_script_path(), "apikey.py")
 if os.path.exists(apifile):
@@ -146,4 +162,4 @@ if os.path.exists(localoverridesfile):
 else:
     print("No local overrides.")
 
-search_and_move_files(search_directory, search_string, destination)
+search_and_move_files(search_directory, search_string, search_term_folder, destination)
