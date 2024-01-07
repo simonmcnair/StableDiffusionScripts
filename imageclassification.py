@@ -1,5 +1,18 @@
 __author__='Simon McNair'
 
+#python3.11 -m venv venv
+#source ./venv/bin/activate
+
+#pip install numpy
+#pip install huggingface_hub
+#pip install onnxruntime
+#pip install pandas
+#pip install opencv
+#pip install opencv-python
+#pip install keras
+#pip install tensorflow
+#sudo apt-get install python3-tk
+
 #importing libraries
 import os
 import glob
@@ -535,7 +548,7 @@ else:
 
             fullpath = os.path.join(defaultdir,filename)
             result = image_to_wd14_tags(fullpath)
-            result = result.replace(', ',',').replace(' ,',',')
+            result = result[1].replace(', ',',').replace(' ,',',')
             result = result.split(',')
             print("hi")
             print(fullpath)
