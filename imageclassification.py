@@ -545,16 +545,16 @@ if gui == True:
 else:
     for root, dirs, files in os.walk(defaultdir):
         for filename in files:
-
-            fullpath = os.path.join(defaultdir,filename)
-            result = image_to_wd14_tags(fullpath)
-            result2 = result[1]
-            #result2 = result2.replace(', ',',').replace(' ,',',')
-            #result2 = result2.split(',')
-            print("hi")
-            print(fullpath)
-            print(str(result))
-            if result2 is not None:
-                modify_exif_tags(fullpath, result2, 'add')
+            if ('jpg','jpeg') in filename:
+                fullpath = os.path.join(defaultdir,filename)
+                result = image_to_wd14_tags(fullpath)
+                result2 = result[1]
+                #result2 = result2.replace(', ',',').replace(' ,',',')
+                #result2 = result2.split(',')
+                print("hi")
+                print(fullpath)
+                print(str(result))
+                if result2 is not None:
+                    modify_exif_tags(fullpath, result2, 'add')
 
 
