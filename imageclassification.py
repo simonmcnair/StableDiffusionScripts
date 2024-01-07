@@ -549,11 +549,11 @@ else:
             fullpath = os.path.join(defaultdir,filename)
             result = image_to_wd14_tags(fullpath)
             result2 = result[1]
-            result2 = result2.replace(', ',',').replace(' ,',',')
-            result2 = result2.split(',')
+            #result2 = result2.replace(', ',',').replace(' ,',',')
+            #result2 = result2.split(',')
             print("hi")
             print(fullpath)
             print(str(result))
-            modify_exif_tags(fullpath, result, 'add')
+            modify_exif_tags(fullpath, result2, 'add')
 
 
