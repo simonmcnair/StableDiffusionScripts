@@ -15,9 +15,9 @@ __author__='Simon McNair'
 
 #importing libraries
 import os
-import glob
-import numpy
-import nltk
+#import glob
+#import numpy
+#import nltk
 from PIL import Image
 from huggingface_hub import hf_hub_download
 from onnxruntime import InferenceSession
@@ -26,13 +26,13 @@ import cv2
 import numpy as np
 from typing import Mapping, Tuple, Dict
 import re
-import threading
+#import threading
 from pathlib import Path
 
-from nltk.corpus import wordnet
-from keras.preprocessing import image
-from keras.applications import ResNet50
-from keras.applications.imagenet_utils import decode_predictions,preprocess_input
+#from nltk.corpus import wordnet
+#from keras.preprocessing import image
+#from keras.applications import ResNet50
+#from keras.applications.imagenet_utils import decode_predictions,preprocess_input
 import tkinter as tk
 from PIL import Image, ImageTk
 
@@ -142,12 +142,15 @@ def modify_exif_tags(filename, tags, command, new_value=None):
                 print("Invalid command. Please use 'add', 'remove', 'show', 'update', 'clear', 'count', or 'search'.")
                 return
 
-            # Join the modified tags list into a string
-            updated_tags_string = ','.join(tags_list)
 
             # Check if the tags have changed
-            if updated_tags_string != tags_string_concat:
+            new_tags_set = set(tags_list)
+            if set(tags) - new_tags_set:
+            #if updated_tags_string != tags_string_concat:
                 # Encode the modified tags string and update the Exif data
+                # Join the modified tags list into a string
+                updated_tags_string = ','.join(tags_list)
+
                 exifdata[custom_tag] = updated_tags_string.encode('utf-16')
 
                 # Save the image with updated Exif data
@@ -361,7 +364,8 @@ def image_to_wd14_tags(filename) \
 
         filtered_tags = {
             tag: score for tag, score in tags.items()
-            if score >= .35
+            #if score >= .35
+            if score >= .80
         }
 
         text_items = []
@@ -541,10 +545,10 @@ else:
     print("No local overrides.")
 
 
-print("loading models")
-model = ResNet50(weights='imagenet')
-nltk.download('wordnet')
-print("models loaded")
+#print("loading models")
+#model = ResNet50(weights='imagenet')
+#nltk.download('wordnet')
+#print("models loaded")
 
 if gui == True:
     #photo = None
@@ -561,16 +565,20 @@ else:
     for root, dirs, files in os.walk(defaultdir):
         for filename in files:
             if filename.lower().endswith(('.jpg', '.jpeg')):
-                fullpath = os.path.join(defaultdir,filename)
-                print("processing " + fullpath)
-                result = image_to_wd14_tags(fullpath)
-                result2 = result[1]
-                #result2 = result2.replace(', ',',').replace(' ,',',')
-                #result2 = result2.split(',')
-                print("hi")
-                print(fullpath)
-                print(str(result))
-                if result2 is not None:
-                    modify_exif_tags(fullpath, result2, 'add')
+                try:
+                    fullpath = os.path.join(root,filename)
+                    print("processing " + fullpath)
+                    result = image_to_wd14_tags(fullpath)
+                    result2 = result[1]
+                    #result2 = result2.replace(', ',',').replace(' ,',',')
+                    #result2 = result2.split(',')
+                    print("hi")
+                    print(fullpath)
+                    print(str(result))
+                    if result2 is not None:
+                        modify_exif_tags(fullpath, result2, 'add')
+                except Exception as e:
+                    print("oops")
+
 
 
