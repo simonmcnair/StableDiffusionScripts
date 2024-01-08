@@ -59,6 +59,7 @@ def prepend_string_to_filename(fullpath, prefix):
 
     return new_fullpath
 
+
 def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
     # Check if the file exists
     if os.path.exists(filename):
@@ -73,9 +74,17 @@ def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
         exifdata = image.getexif()
 
         # Use a custom tag (you can modify this based on your requirements)
+        found = False
         if tagname is not None:
-            custom_tag = tagname
-        else:
+                for pil_tag, pil_tag_name in TAGS.items():
+                    if pil_tag_name == tagname:
+                        custom_tag = hex(pil_tag_name)
+                        print("using " + tagname + " for tag")
+                        found = True
+                        break
+        if found == False or tagname == None:
+            # 40094:0x9C9E:'XPKeywords'
+            print("using XPKeywords for tag")
             custom_tag = 0x9C9E
 
         # Check if the custom tag is present in the Exif data
@@ -353,7 +362,7 @@ WAIFU_MODELS: Mapping[str, WaifuDiffusionInterrogator] = {
 RE_SPECIAL = re.compile(r'([\\()])')
 
 #def image_to_wd14_tags(filename, image:Image.Image) \
-def image_to_wd14_tags(filename) \
+def image_to_wd14_tags(filename,modeltouse='wd14-vit-v2') \
         -> Tuple[Mapping[str, float], str, Mapping[str, float]]:
     
     try:
@@ -364,8 +373,10 @@ def image_to_wd14_tags(filename) \
         return None
 
     try:
-        model = WAIFU_MODELS['wd14-vit-v2']
+        model = WAIFU_MODELS[modeltouse]
         ratings, tags = model.interrogate(image)
+
+        #ratings1, tags1 = CLIPInterrogator.interrogate(image)
 
         filtered_tags = {
             tag: score for tag, score in tags.items()
@@ -574,9 +585,11 @@ else:
                     fullpath = os.path.join(root,filename)
                     print("processing " + fullpath)
                     result = image_to_wd14_tags(fullpath)
+                    #result = image_to_wd14_tags(fullpath,'wd14-convnext')
+
                     result2 = result[1]
-                    #result2 = result2.replace(', ',',').replace(' ,',',')
-                    #result2 = result2.split(',')
+
+                    
                     print("hi")
                     print(fullpath)
                     print(str(result))
