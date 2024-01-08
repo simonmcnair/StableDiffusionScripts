@@ -18,7 +18,9 @@ import os
 #import glob
 #import numpy
 #import nltk
-from PIL import Image
+from PIL.ExifTags import TAGS
+from PIL import Image, ImageTk
+
 from huggingface_hub import hf_hub_download
 from onnxruntime import InferenceSession
 import pandas as pd
@@ -34,7 +36,7 @@ from pathlib import Path
 #from keras.applications import ResNet50
 #from keras.applications.imagenet_utils import decode_predictions,preprocess_input
 import tkinter as tk
-from PIL import Image, ImageTk
+
 
 def get_script_name():
     # Use os.path.basename to get the base name (script name) from the full path
@@ -57,7 +59,7 @@ def prepend_string_to_filename(fullpath, prefix):
 
     return new_fullpath
 
-def modify_exif_tags(filename, tags, command, new_value=None):
+def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
     # Check if the file exists
     if os.path.exists(filename):
         # Open the image
@@ -71,7 +73,10 @@ def modify_exif_tags(filename, tags, command, new_value=None):
         exifdata = image.getexif()
 
         # Use a custom tag (you can modify this based on your requirements)
-        custom_tag = 0x9C9E
+        if tagname is not None:
+            custom_tag = tagname
+        else:
+            custom_tag = 0x9C9E
 
         # Check if the custom tag is present in the Exif data
         if custom_tag not in exifdata:
@@ -576,7 +581,8 @@ else:
                     print(fullpath)
                     print(str(result))
                     if result2 is not None:
-                        modify_exif_tags(fullpath, result2, 'add')
+                        tagname = 'EXIF:XPKeywords'
+                        modify_exif_tags(fullpath, result2, 'add',tagname)
                 except Exception as e:
                     print("oops")
 
