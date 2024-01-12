@@ -119,6 +119,7 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
                         move_file_to_subfolder(file_path, foldername)
                     if movetofixedfolder ==True:
                         move_file_to_fixedfolder(file_path,dest ,foldername)
+                    continue
                 else:
                     print(term + " does not exist in filename " + file)
 
