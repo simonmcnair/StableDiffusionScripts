@@ -109,52 +109,55 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
             if not os.path.isfile(file_path):
                 continue
             hasparameters = False
-
+            found = False
             for term in terms:
                 if term.lower() in file:
                     print('search term exists in filename')
                     if movetofixedfolder == True:
                         move_file_to_fixedfolder(file_path,dest ,foldername)
-                        continue
+                        found = True
                     else:
                         move_file_to_subfolder(file_path, foldername)
-                        continue
+                        found = True
                 else:
                     print(term + " does not exist in filename " + file)
+            
+            if found == False:
 
-            if file_path.endswith(".png"):
-                with Image.open(file_path) as img:
-                    try:
-                        parameter = img.info.get("parameters")
-                        if parameter is not None:
-                            print(file_path + " has metadata.")
-                            hasparameters = True
-                            parameter = parameter.lower()
+                if file_path.endswith(".png"):
+                    with Image.open(file_path) as img:
+                        try:
+                            parameter = img.info.get("parameters")
+                            if parameter is not None:
+                                print(file_path + " has metadata.")
+                                hasparameters = True
+                                parameter = parameter.lower()
 
-                        else:
-                            print("PNG with no metadata")
+                            else:
+                                print("PNG with no metadata")
+                                badfile = True
+                        except:
                             badfile = True
-                    except:
-                        badfile = True
 
-            if hasparameters ==True:
-                #if any(terms) in parameter:
-                for term in terms:
-                #if any(term in parameter for term in terms):
-                    if term.lower() in parameter:
-                        print(parameter)
-                        print(f"Found '{term}' in parameters for : {file_path}")
-                        #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
-                        #if user_input == 'y':
-                        if movetofixedfolder == True:
-                            move_file_to_fixedfolder(file_path,dest ,foldername)
+                if hasparameters ==True:
+                    #if any(terms) in parameter:
+                    for term in terms:
+                    #if any(term in parameter for term in terms):
+                        if term.lower() in parameter:
+                            print(parameter)
+                            print(f"Found '{term}' in parameters for : {file_path}")
+                            #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
+                            #if user_input == 'y':
+                            if movetofixedfolder == True:
+                                move_file_to_fixedfolder(file_path,dest ,foldername)
+                            else:
+                                move_file_to_subfolder(file_path, foldername)
                         else:
-                            move_file_to_subfolder(file_path, foldername)
-                    else:
-                        print(term + " not found in parameters for " + file_path)
+                            print(term + " not found in parameters for " + file_path)
 
-            else:
-                continue
+                else:
+                    print("no parameters.  Skipping")
+                    continue
 
 # Directory to search
 search_directory =  '/path/to/search'
