@@ -116,11 +116,11 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
                     if movetofixedfolder == True:
                         move_file_to_fixedfolder(file_path,dest ,foldername)
                         found = True
-                        break
+                        continue
                     else:
                         move_file_to_subfolder(file_path, foldername)
                         found = True
-                        break
+                        continue
             
             if found == False:
                 print("Terms did not exist in filename.  Checking params" + file)
