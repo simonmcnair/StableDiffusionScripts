@@ -123,7 +123,7 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
                         continue
             
             if found == False:
-                print("Terms did not exist in filename.  Checking params" + file)
+                print("Terms did not exist in filename.  Checking params for " + file)
 
                 if file_path.endswith(".png"):
                     with Image.open(file_path) as img:
