@@ -75,6 +75,7 @@ def move_file_to_fixedfolder(filename, folder,keyword):
 # Search for files containing a specific string
 def search_and_move_files(searchdirectory, search_string, foldername,dest=False, ):
     print("searching " + searchdirectory)
+    print("destination " + str(dest))
     print("Moving to " + foldername)
     print("Search term" + str(search_string))
 
@@ -126,7 +127,7 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
                 #if any(terms) in parameter:
                 for term in terms:
                 #if any(term in parameter for term in terms):
-                    if term in parameter:
+                    if term.lower() in parameter:
                         print(parameter)
                         print(f"Found '{term}' in: {file_path}")
                         #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
