@@ -118,17 +118,20 @@ def search_and_move_files(directory, search_string, foldername,dest=False, ):
                         badfile = True
 
             if hasparameters ==True:
-                if any(terms) in parameter:
-                    print(parameter)
-                    print(f"Found '{search_string}' in: {file_path}")
-                    #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
-                    #if user_input == 'y':
-                    if movetosubfolder == True:
-                        move_file_to_subfolder(file_path, foldername)
-                    if movetofixedfolder ==True:
-                        move_file_to_fixedfolder(file_path,dest ,foldername)
+                #if any(terms) in parameter:
+                for term in terms:
+                #if any(term in parameter for term in terms):
+                    if term in parameter:
+                        print(parameter)
+                        print(f"Found '{term}' in: {file_path}")
+                        #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
+                        #if user_input == 'y':
+                        if movetosubfolder == True:
+                            move_file_to_subfolder(file_path, foldername)
+                        if movetofixedfolder ==True:
+                            move_file_to_fixedfolder(file_path,dest ,foldername)
                 else:
-                    print(search_string + " not found in " + file_path)
+                    print(term + " not found in " + file_path)
 
             else:
                 continue
