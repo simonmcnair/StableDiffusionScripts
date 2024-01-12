@@ -121,10 +121,9 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
                         move_file_to_subfolder(file_path, foldername)
                         found = True
                         break
-                else:
-                    print(term + " does not exist in filename " + file)
             
             if found == False:
+                print("Terms did not exist in filename.  Checking params" + file)
 
                 if file_path.endswith(".png"):
                     with Image.open(file_path) as img:
