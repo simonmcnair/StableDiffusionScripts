@@ -96,6 +96,9 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
         print("It's a list!")
         terms = search_string
 
+    #make the list lowercase
+    terms = [item.lower() for item in terms]
+
     if dest == False:
         movetosubfolder = True
     else:
@@ -108,6 +111,17 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
             if not os.path.isfile(file_path):
                 continue
             hasparameters = False
+
+            for term in terms:
+                if term.lower() in file:
+                    print('search term exists in filename')
+                    if movetosubfolder == True:
+                        move_file_to_subfolder(file_path, foldername)
+                    if movetofixedfolder ==True:
+                        move_file_to_fixedfolder(file_path,dest ,foldername)
+                else:
+                    print(term + " does not exist in filename " + file)
+
             if file_path.endswith(".png"):
                 with Image.open(file_path) as img:
                     try:
@@ -129,24 +143,18 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
                 #if any(term in parameter for term in terms):
                     if term.lower() in parameter:
                         print(parameter)
-                        print(f"Found '{term}' in: {file_path}")
+                        print(f"Found '{term}' in parameters for : {file_path}")
                         #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
                         #if user_input == 'y':
                         if movetosubfolder == True:
                             move_file_to_subfolder(file_path, foldername)
                         if movetofixedfolder ==True:
                             move_file_to_fixedfolder(file_path,dest ,foldername)
-                else:
-                    print(term + " not found in " + file_path)
+                    else:
+                        print(term + " not found in parameters for " + file_path)
 
             else:
                 continue
-
-            #with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            #    contents = f.read()
-
-            #if search_string in contents:
-                
 
 # Directory to search
 search_directory =  '/path/to/search'
