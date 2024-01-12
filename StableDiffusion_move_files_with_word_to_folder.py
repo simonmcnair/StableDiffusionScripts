@@ -73,7 +73,11 @@ def move_file_to_fixedfolder(filename, folder,keyword):
         print(f"Error moving '{filename}' to '{destination}': {str(e)}")
 
 # Search for files containing a specific string
-def search_and_move_files(directory, search_string, foldername,dest=False, ):
+def search_and_move_files(searchdirectory, search_string, foldername,dest=False, ):
+    print("searching " + searchdirectory)
+    print("Moving to " + foldername)
+    print("Search term" + str(search_string))
+
     movetosubfolder = False
     movetofixedfolder = False
 
@@ -96,7 +100,7 @@ def search_and_move_files(directory, search_string, foldername,dest=False, ):
     else:
         movetofixedfolder = True
 
-    for root, dirs, files in os.walk(directory):
+    for root, dirs, files in os.walk(searchdirectory):
         for file in files:
             print("processing " + file)
             file_path = os.path.join(root, file)
