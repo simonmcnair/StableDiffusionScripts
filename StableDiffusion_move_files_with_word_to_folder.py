@@ -79,9 +79,6 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
     print("Moving to " + foldername)
     print("Search term" + str(search_string))
 
-    movetosubfolder = False
-    movetofixedfolder = False
-
     if isinstance(search_string, str):
         print("It's a string!")
         if ',' in search_string:
@@ -99,10 +96,11 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
     #make the list lowercase
     terms = [item.lower() for item in terms]
 
-    if dest == False:
-        movetosubfolder = True
-    else:
+
+    if dest != False:
         movetofixedfolder = True
+    else:
+        movetofixedfolder = False
 
     for root, dirs, files in os.walk(searchdirectory):
         for file in files:
@@ -115,11 +113,11 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
             for term in terms:
                 if term.lower() in file:
                     print('search term exists in filename')
-                    if movetosubfolder == True:
-                        move_file_to_subfolder(file_path, foldername)
-                    if movetofixedfolder ==True:
+                    if movetofixedfolder == True:
                         move_file_to_fixedfolder(file_path,dest ,foldername)
-                    break
+                    else:
+                        move_file_to_subfolder(file_path, foldername)
+                    continue
                 else:
                     print(term + " does not exist in filename " + file)
 
@@ -147,10 +145,10 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
                         print(f"Found '{term}' in parameters for : {file_path}")
                         #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
                         #if user_input == 'y':
-                        if movetosubfolder == True:
-                            move_file_to_subfolder(file_path, foldername)
-                        if movetofixedfolder ==True:
+                        if movetofixedfolder == True:
                             move_file_to_fixedfolder(file_path,dest ,foldername)
+                        else:
+                            move_file_to_subfolder(file_path, foldername)
                     else:
                         print(term + " not found in parameters for " + file_path)
 
