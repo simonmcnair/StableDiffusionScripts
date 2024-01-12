@@ -98,6 +98,7 @@ def search_and_move_files(directory, search_string, foldername,dest=False, ):
 
     for root, dirs, files in os.walk(directory):
         for file in files:
+            print("processing " + file)
             file_path = os.path.join(root, file)
             if not os.path.isfile(file_path):
                 continue
