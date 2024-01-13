@@ -25,8 +25,8 @@ def sanitize_folder_name(folder_name):
 
 
 # Function to move a file to a subfolder with the given name
-def move_file_to_subfolder(filename, subfolder_name):
-    file_location = os.path.dirname(filename)
+def move_file_to_subfolder(filepath, subfolder_name):
+    file_location = os.path.dirname(filepath)
     destination_folder = os.path.join(file_location, subfolder_name)
 
     subfolder_name = sanitize_folder_name(subfolder_name)
@@ -34,7 +34,7 @@ def move_file_to_subfolder(filename, subfolder_name):
         os.makedirs(destination_folder)
 
     # Construct the destination path
-    destination = os.path.join(destination_folder, os.path.basename(filename))
+    destination = os.path.join(destination_folder, os.path.basename(filepath))
 
     # Handle duplicate filenames
     base, ext = os.path.splitext(destination)
@@ -43,22 +43,26 @@ def move_file_to_subfolder(filename, subfolder_name):
         destination = f"{base}_{count}{ext}"
         count += 1
 
-    try:
-        shutil.move(filename, destination)
-    except Exception as e:
-        print(f"Error moving '{filename}' to '{destination}': {str(e)}")
+    if os.path.abspath(filepath) == os.path.abspath(destination):
+        print("Source and destination are the same. No move needed.")
+        return
 
-def move_file_to_fixedfolder(filename, folder,keyword):
+    try:
+        shutil.move(filepath, destination)
+    except Exception as e:
+        print(f"Error moving '{filepath}' to '{destination}': {str(e)}")
+
+def move_file_to_fixedfolder(filepath, folder,keyword):
     keyword = sanitize_folder_name(keyword)
 
-    file_location = os.path.dirname(filename)
+    file_location = os.path.dirname(filepath)
     destination_folder = os.path.join(file_location, folder,keyword)
 
     if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
 
     # Construct the destination path
-    destination = os.path.join(destination_folder, os.path.basename(filename))
+    destination = os.path.join(destination_folder, os.path.basename(filepath))
 
     # Handle duplicate filenames
     base, ext = os.path.splitext(destination)
@@ -67,10 +71,14 @@ def move_file_to_fixedfolder(filename, folder,keyword):
         destination = f"{base}_{count}{ext}"
         count += 1
 
+    if os.path.abspath(filepath) == os.path.abspath(destination):
+        print("Source and destination are the same. No move needed.")
+        return
+
     try:
-        shutil.move(filename, destination)
+        shutil.move(filepath, destination)
     except Exception as e:
-        print(f"Error moving '{filename}' to '{destination}': {str(e)}")
+        print(f"Error moving '{filepath}' to '{destination}': {str(e)}")
 
 # Search for files containing a specific string
 def search_and_move_files(searchdirectory, search_string, foldername,dest=False, ):
