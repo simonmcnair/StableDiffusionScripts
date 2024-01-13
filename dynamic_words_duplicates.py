@@ -23,6 +23,46 @@ def find_duplicate_words_in_directory(root_folder):
    
     return word_occurrences
 
+def remove_duplicate_lines_interactively(file_word_mapping):
+    for file_path, words in file_word_mapping.items():
+        print(f"Processing file: {file_path}")
+
+        unique_words = list(set(words))
+        lines_to_write = []
+
+        for word in unique_words:
+            if words.count(word) > 1:
+                print(f"\nDuplicate word found: {word}")
+                print(f"Original lines: {words}")
+
+                # Prompt the user to choose which file retains the word
+                choice = input(f"Choose the file to retain the word ('{file_path}' or another file): ")
+
+                if choice != file_path:
+                    # Remove the word from other files
+                    for other_file_path in file_word_mapping.keys():
+                        if choice == other_file_path:
+                            file_word_mapping[other_file_path] = [w for w in file_word_mapping[other_file_path] if w != word]
+
+                # Build lines to write for the current file
+                lines_to_write.extend(line for line in open(file_path, 'r', encoding='utf-8', errors='ignore') if word not in line)
+
+        # Update the actual file with the modified content
+        with open(file_path, 'w', encoding='utf-8', errors='ignore') as file:
+            file.writelines(lines_to_write)
+
+
+def create_file_word_mapping(word_occurrences):
+    file_word_mapping = defaultdict(list)
+
+    for word, files in word_occurrences.items():
+        for file_path in files:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
+                words = [word.strip() for line in file for word in line.split()]
+                file_word_mapping[file_path].extend(words)
+
+    return file_word_mapping
+
 def write_csv(output_file, word_occurrences):
     with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
         csv_writer = csv.writer(csvfile)
