@@ -597,6 +597,7 @@ def main():
     global sorted_folder
     global root_directory
     global stylefilepath
+    global dump_prompt
 
     # Create a dictionary to store file hashes and corresponding folders
     file_hash_to_folder = {}
@@ -634,6 +635,19 @@ def main():
                             hasparameters = True
                             badfile = False
                             parameter = parameter.lower()
+                            if dump_prompt == True:
+                                csv_filename = os.path.join(root_directory,'parameters.csv')
+                                if not os.path.exists(csv_filename):
+                                    with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
+                                        csv_writer = csv.writer(csv_file)
+                                        csv_writer.writerow(['filename', 'prompt'])
+                                        csv_writer.writerows([filename,parameter])
+                                else:
+                                    with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
+                                    csv_writer = csv.writer(csv_file)
+                                    csv_writer.writerows([filename,parameter])
+
+
                         else:
                             #print("PNG with no metadata")
                             try:
@@ -643,6 +657,7 @@ def main():
                                     hasparameters = True
                                     badfile = False
                                     print("we don't handle comfyui yet")
+
                                     continue
                                 else:
                                     #print("PNG with no metadata")
@@ -902,13 +917,9 @@ def main():
 
     print("Files have been organized into folders.")
 
-
-
-
 root_directory = '/file/to/sort/'
 stylefilepath = '/path/to/styles.csv'
 sorted_folder = '/file/to/Sorted/'
-
 
 readstyles = True
 showcounts = True
@@ -919,6 +930,7 @@ renamefiles = True
 moveiffilesover = 1
 comparebymd5 = False
 comparebytext=True
+dump_prompt = True
 comparebytextpercentage=90
 useapikey = False
 
