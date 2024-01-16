@@ -134,15 +134,11 @@ def get_models():
                                     if response.status_code == 200:
                                         content_disposition = response.headers.get("Content-Disposition", None)
 
-                                        if 'html' in str(response.content):
-                                            print("This is wrong")
-                                            print("This is wrong")
-                                        else:
-                                            with open(download_fullpath, 'wb') as file2:
-                                                file2.write(response.content)
-                                            write_to_log(logfile_path, f"File downloaded successfully to {download_fullpath}")
-                                            write_to_log(successfile_path, f"{model},{downloadurl},{downloadfilename}")
-                                            break
+                                        with open(download_fullpath, 'wb') as file2:
+                                            file2.write(response.content)
+                                        write_to_log(logfile_path, f"File downloaded successfully to {download_fullpath}")
+                                        write_to_log(successfile_path, f"{model},{downloadurl},{downloadfilename}")
+                                        break
                                     else:
                                         write_to_log(logfile_path, f"Failed to download file. Status code: {response.status_code}")
                             else:
