@@ -644,8 +644,8 @@ def main():
                                         csv_writer.writerows([filename,parameter])
                                 else:
                                     with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
-                                    csv_writer = csv.writer(csv_file)
-                                    csv_writer.writerows([filename,parameter])
+                                        csv_writer = csv.writer(csv_file)
+                                        csv_writer.writerows([filename,parameter])
 
 
                         else:

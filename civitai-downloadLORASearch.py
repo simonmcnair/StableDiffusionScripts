@@ -151,13 +151,15 @@ def get_models():
                                 write_to_log(logfile_path, "file already exists")
                         else:
                             write_to_log(logfile_path, "file type is" + f": {file.get('type')}.  Filename: {file.get('name')}")
-
-            # Check if there are more pages
-            if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
-                break 
-            else:
-                page += 1
         else:
+            print("no items returned")
+
+        # Check if there are more pages
+        if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
+            break 
+        else:
+            page += 1
+
             break
 
 Lora_download_to = '/folder/to/download/to'

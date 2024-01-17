@@ -37,6 +37,7 @@ def get_models():
     global api_key
     # Initialize the first page
     page = 1
+    batchsize = 100
 
     while True:
         # Make API request for the current page
@@ -46,10 +47,16 @@ def get_models():
 #            headers["Authorization"] = f"Bearer {api_key}"
 
         params = {'page': page}
-
+        print("processing page " + str(page))
+        u = 0
         while True:
+
+
+            
+ 
             try:
-                response = requests.get('https://civitai.com/api/v1/models?limit=100&types=LORA', headers=headers, params=params)
+                req = f'https://civitai.com/api/v1/models?limit={batchsize}&types=LORA'
+                response = requests.get(req, headers=headers, params=params)
             except Exception as e:
                  write_to_log(logfile_path, "Error " + str(e))
 
@@ -63,12 +70,13 @@ def get_models():
             if response.status_code == 401 and api_key:
                 # Retry the request with the API key
                 headers["Authorization"] = f"Bearer {api_key}"
-                response = requests.get('https://civitai.com/api/v1/models?limit=100&types=LORA', headers=headers, params=params)
+                response = requests.get(req, headers=headers, params=params)
 
             if response.status_code == 200:
                 try:
                     data = response.json()
                     if 'items' in data:
+                        print("found items.  Legitimate data")
                         break
                 except Exception as e:
                     write_to_log(logfile_path, "Error " + str(e))
@@ -76,7 +84,12 @@ def get_models():
             else:
                  time.sleep(5)
                  write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
- 
+
+
+        u += 1
+        if u == batchsize:
+            u = 1
+        
         # Check if there are models in the response
         if 'items' in data:
             # Extract 'id' field from each model and add it to the list
@@ -148,10 +161,12 @@ def get_models():
 
             # Check if there are more pages
             if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
+                print("ran out of pages")
                 break 
             else:
                 page += 1
         else:
+            print("no items found")
             break
 
 download_to = '/folder/to/download/to'
