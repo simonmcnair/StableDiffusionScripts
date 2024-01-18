@@ -50,10 +50,6 @@ def get_models():
         print("processing page " + str(page))
         u = 0
         while True:
-
-
-            
- 
             try:
                 req = f'https://civitai.com/api/v1/models?limit={batchsize}&types=LORA'
                 response = requests.get(req, headers=headers, params=params)
@@ -84,11 +80,6 @@ def get_models():
             else:
                  time.sleep(5)
                  write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
-
-
-        u += 1
-        if u == batchsize:
-            u = 1
         
         # Check if there are models in the response
         if 'items' in data:

@@ -59,7 +59,9 @@ def get_models():
     global DownloadLORASearch
     # Initialize the first page
     page = 1
-
+    qty = 10
+    i = 0
+    togglequit = False
     while True:
         # Make API request for the current page
         headers = {'Content-Type': 'application/json'}
@@ -67,8 +69,8 @@ def get_models():
 
         while True:
             try:
-                est = f'https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}'
-                response = requests.get(f'https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}', headers=headers, params=params)
+                est = f'https://civitai.com/api/v1/models?limit={qty}&types=LORA&query={DownloadLORASearch}'
+                response = requests.get(f'https://civitai.com/api/v1/models?limit={qty}&types=LORA&query={DownloadLORASearch}', headers=headers, params=params)
             except Exception as e:
                  write_to_log(logfile_path, "Error " + str(e))
 
@@ -95,24 +97,21 @@ def get_models():
         # Check if there are models in the response
         if 'items' in data:
             # Extract 'id' field from each model and add it to the list
-            write_to_log(logfile_path, "totalcnt = " + str(data['metadata'].get('totalItems')))
-            write_to_log(logfile_path, "page = " + str(data['metadata'].get('currentPage')) + " of " + str(data['metadata'].get('totalPages')))
+            totalcnt = data['metadata'].get('totalItems')
+            write_to_log(logfile_path, "totalcnt = " + str(totalcnt))
+            write_to_log(logfile_path, "page = " + str(data['metadata'].get('currentPage')) + " of #" + str(data['metadata'].get('totalPages')))
             for each in data['items']:
+                i += 1
                 id = each.get('id')
                 name = each.get('name')
-                write_to_log(logfile_path, "processing " + str(id) + f" ({name})")
+                write_to_log(logfile_path, "processing #" + str(i) + " of " + str(totalcnt) + " " + str(id) + f" ({name})")
 
- 
                 for each1 in each['modelVersions']:
                     model = each1.get('name')
                     model_id = each1.get('id')
-                        
                     for file in each1['files']:
-                            
                         if file.get('type') =="Model":
-                            
                             write_to_log(successfile_path, "found LORA")
-                            
                             downloadurl = file.get('downloadUrl')
 
                             destination_folder = sanitise_filepath(os.path.join(Lora_download_to,DownloadLORASearch))
@@ -154,13 +153,14 @@ def get_models():
         else:
             print("no items returned")
 
+        if togglequit == True:
+            break
         # Check if there are more pages
         if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
-            break 
+            print("lastpage")
+            togglequit = True
         else:
-            page += 1
-
-            break
+            page += 1 
 
 Lora_download_to = '/folder/to/download/to'
 DownloadLORASearch = 'Lora to search for'
