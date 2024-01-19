@@ -3,6 +3,14 @@ __author__='Simon McNair'
 #python3.11 -m venv venv
 #source ./venv/bin/activate
 
+# install torch with GPU support for example:
+#pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu117
+# install clip-interrogator
+#pip install clip-interrogator
+#pip install clip-interrogator==0.5.4
+# or for very latest WIP with BLIP2 support
+#pip install clip-interrogator==0.6.0
+
 #pip install numpy
 #pip install huggingface_hub
 #pip install onnxruntime
@@ -16,25 +24,15 @@ __author__='Simon McNair'
 #importing libraries
 import os
 #import glob
-import numpy
-import nltk
 from PIL.ExifTags import TAGS
 from PIL import Image, ImageTk
+from clip_interrogator import Config, Interrogator
 
-from huggingface_hub import hf_hub_download
-from onnxruntime import InferenceSession
-import pandas as pd
-import cv2
-import numpy as np
-from typing import Mapping, Tuple, Dict
+
 import re
 #import threading
 from pathlib import Path
 
-from nltk.corpus import wordnet
-from keras.preprocessing import image
-from keras.applications import ResNet50
-from keras.applications.imagenet_utils import decode_predictions,preprocess_input
 
 import tkinter as tk
 
@@ -193,191 +191,6 @@ def load_image_in_thread(image_path):
 
     return ImageTk.PhotoImage(image1)
 
-def image_make_square(img, target_size):
-    old_size = img.shape[:2]
-    desired_size = max(old_size)
-    desired_size = max(desired_size, target_size)
-
-    delta_w = desired_size - old_size[1]
-    delta_h = desired_size - old_size[0]
-    top, bottom = delta_h // 2, delta_h - (delta_h // 2)
-    left, right = delta_w // 2, delta_w - (delta_w // 2)
-
-    color = [255, 255, 255]
-    return cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
-
-# noinspection PyUnresolvedReferences
-def image_smart_resize(img, size):
-    # Assumes the image has already gone through image_make_square
-    if img.shape[0] > size:
-        img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
-    elif img.shape[0] < size:
-        img = cv2.resize(img, (size, size), interpolation=cv2.INTER_CUBIC)
-    else:  # just do nothing
-        pass
-
-    return img
-
-################################################################################################
-################################################################################################
-
-class CLIPInterrogator:
-    def __init__(
-            self,
-            repo='SmilingWolf/wd-v1-4-vit-tagger-v2',
-            model_path='model.onnx',
-            tags_path='selected_tags.csv',
-            mode: str = "auto"
-    ) -> None:
-        self.__repo = repo
-        self.__model_path = model_path
-        self.__tags_path = tags_path
-        self._provider_mode = mode
-
-        self.__initialized = False
-        self._model, self._tags = None, None
-
-    def _init(self) -> None:
-        if self.__initialized:
-            return
-
-        model_path = hf_hub_download(self.__repo, filename=self.__model_path)
-        tags_path = hf_hub_download(self.__repo, filename=self.__tags_path)
-
-        self._model = InferenceSession(str(model_path))
-        self._tags = pd.read_csv(tags_path)
-
-        self.__initialized = True
-
-    def _calculation(self, image: Image.Image)  -> pd.DataFrame:
-        self._init()
-
-        _, height, _, _ = self._model.get_inputs()[0].shape
-
-        # alpha to white
-        image = image.convert('RGBA')
-        new_image = Image.new('RGBA', image.size, 'WHITE')
-        new_image.paste(image, mask=image)
-        image = new_image.convert('RGB')
-        image = np.asarray(image)
-
-        # PIL RGB to OpenCV BGR
-        image = image[:, :, ::-1]
-
-        image = image_make_square(image, height)
-        image = image_smart_resize(image, height)
-        image = image.astype(np.float32)
-        image = np.expand_dims(image, 0)
-
-        # evaluate model
-        input_name = self._model.get_inputs()[0].name
-        label_name = self._model.get_outputs()[0].name
-        confidence = self._model.run([label_name], {input_name: image})[0]
-
-        full_tags = self._tags[['name', 'category']].copy()
-        full_tags['confidence'] = confidence[0]
-
-        return full_tags
-
-    def interrogate(self, image: Image) -> Tuple[Dict[str, float], Dict[str, float]]:
-        full_tags = self._calculation(image)
-
-        # first 4 items are for rating (general, sensitive, questionable, explicit)
-        ratings = dict(full_tags[full_tags['category'] == 9][['name', 'confidence']].values)
-
-        # rest are regular tags
-        tags = dict(full_tags[full_tags['category'] != 9][['name', 'confidence']].values)
-
-        return ratings, tags
-################################################################################################
-################################################################################################
-
-################################################################################################
-def generate_tags(prediction):
-    #variable
-    tags=''
-    #filtering predicitions with 60% or more probability
-    #tags along with their synonyms are returned
-    for x in range(0,5):
-        if float(prediction[0][x][2])*100>=50:
-            #getting synonyms
-            if len(tags)==0:
-                tags=str(prediction[0][x][1]) + ',' + get_synonyms(str(prediction[0][x][1]))
-            else:
-                tags = tags + ', '+ str(prediction[0][x][1]) + ',' + get_synonyms(str(prediction[0][x][1]))
-
-    #returning tags
-    return tags
-################################################################################################
-def get_synonyms(word):
-    synonyms=''
-    for syn in wordnet.synsets(word):
-        for lma in syn.lemmas():
-            if not str(lma.name()).lower()==str(word).lower():
-                if len(synonyms)==0:
-                    synonyms=synonyms + lma.name()
-                else:
-                    synonyms = synonyms + ', ' + lma.name()
-
-    return synonyms
-################################################################################################
-def get_predictions(model,imagepath):
-    #loading image
-    #converting to array and preprocessing image
-    img=image.load_img(path=os.path.abspath(imagepath),target_size=(224,224))
-    img_arr=image.img_to_array(img)
-    img_arr=numpy.expand_dims(img_arr,axis=0)
-    img_arr=preprocess_input(img_arr)
-    #prediciton
-    pred=model.predict(img_arr)
-    return decode_predictions(pred)
-################################################################################################
-def different_tag_process(imagefile):
-    model = ResNet50(weights='imagenet')
-    prediction=get_predictions(model,imagefile)
-    #generating tags from prediction
-    tags = generate_tags(prediction)
-
-    return prediction, tags
-################################################################################################
-
-################################################################################################
-#def image_to_wd14_tags(filename, image:Image.Image) \
-def image_to_wd14_tags(filename,modeltouse='wd14-vit-v2') \
-        -> Tuple[Mapping[str, float], str, Mapping[str, float]]:
-    
-    try:
-        image = Image.open(filename)
-        print("image: " + filename + " successfully opened.  Continue processing ")
-    except Exception as e:
-        print("Processfile Exception1: " + " failed to open image : " + filename + ". FAILED Error: " + str(e) + ".  Skipping")
-        return None
-
-    try:
-        model = CLIPInterrogatorModels[modeltouse]
-        ratings, tags = model.interrogate(image)
-
-        filtered_tags = {
-            tag: score for tag, score in tags.items()
-            #if score >= .35
-            if score >= .80
-        }
-
-        text_items = []
-        tags_pairs = filtered_tags.items()
-        tags_pairs = sorted(tags_pairs, key=lambda x: (-x[1], x[0]))
-        for tag, score in tags_pairs:
-            tag_outformat = tag
-            tag_outformat = tag_outformat.replace('_', ' ')
-            tag_outformat = re.sub(RE_SPECIAL, r'\\\1', tag_outformat)
-            text_items.append(tag_outformat)
-        #output_text = ', '.join(text_items)
-        #return ratings, output_text, filtered_tags
-        return ratings, text_items, filtered_tags
-    except Exception as e:
-        print(f"Exception getting tags from image {filename}.  Error: {e}" )
-        return None
-################################################################################################
 
 ################################################################################################
 #GUI
@@ -545,14 +358,6 @@ else:
     print("No local overrides.")
 
 
-CLIPInterrogatorModels: Mapping[str, CLIPInterrogator] = {
-    'wd14-vit-v2': CLIPInterrogator(),
-    'wd14-convnext': CLIPInterrogator(repo='SmilingWolf/wd-v1-4-convnext-tagger'),
-    'ViT-L-14/openai': CLIPInterrogator(),
-    'ViT-H-14/laion2b_s32b_b79': CLIPInterrogator(),
-    'ViT-L-14/openai': CLIPInterrogator()
-}
-
 RE_SPECIAL = re.compile(r'([\\()])')
 
 if gui == True:
@@ -572,11 +377,11 @@ else:
         'ViT-H-14/laion2b_s32b_b79',
         'ViT-L-14/openai',  # This line had a missing comma in the original list
         'wd14-convnext'
-#       'blip-base': 'Salesforce/blip-image-captioning-base',   # 990MB
-#       'blip-large': 'Salesforce/blip-image-captioning-large', # 1.9GB
-#       'blip2-2.7b': 'Salesforce/blip2-opt-2.7b',              # 15.5GB
-#       'blip2-flan-t5-xl': 'Salesforce/blip2-flan-t5-xl',      # 15.77GB
-#       'git-large-coco': 'microsoft/git-large-coco',           # 1.58GB
+#            'blip-base': 'Salesforce/blip-image-captioning-base',   # 990MB
+#    'blip-large': 'Salesforce/blip-image-captioning-large', # 1.9GB
+#    'blip2-2.7b': 'Salesforce/blip2-opt-2.7b',              # 15.5GB
+#    'blip2-flan-t5-xl': 'Salesforce/blip2-flan-t5-xl',      # 15.77GB
+#    'git-large-coco': 'microsoft/git-large-coco',           # 1.58GB
 
     ]
 
@@ -587,14 +392,14 @@ else:
                     fullpath = os.path.join(root,filename)
                     
                     for each in modelarray:
-                        print(f"using {each} to process {fullpath}")
-                        ratings, text_items, filtered_tags = image_to_wd14_tags(fullpath,each)
-                        print(f"using {each} caption returned was {ratings}. {text_items} {filtered_tags}")
 
-                    prediction, tags = different_tag_process(fullpath)
-                    print(f"using resnet50 caption returned was {prediction}  . {tags}")
 
-                    ratings, tags = CLIPInterrogator.interrogate()
+                        from PIL import Image
+                        from clip_interrogator import Config, Interrogator
+                        image = Image.open(fullpath).convert('RGB')
+                        ci = Interrogator(Config(clip_model_name=each))
+                        print(ci.interrogate(image))
+
                     
 
                     break
