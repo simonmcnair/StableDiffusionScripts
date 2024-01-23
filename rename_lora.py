@@ -89,6 +89,7 @@ def rename_file_grouping(filepath, new_filename):
     for root, dirs, files in os.walk(directory):
         for filename in files:
             #print("processing " + filename)
+
             if new_filename in filename:
                 print(new_filename + " already exists in " + filename + ".  Skipping")
                 continue
@@ -98,6 +99,16 @@ def rename_file_grouping(filepath, new_filename):
             splitbyperiod = os.path.basename(filename).split('.', 1)
             filenamebeforeanyperiods = splitbyperiod[0]
             remainder = splitbyperiod[1]
+
+            result = re.search(r'\d+_\d+_\d+_\d+_(.*)', filenamebeforeanyperiods)
+            if result:
+                desired_part = result.group(1)
+                filenamebeforeanyperiods = os.path.normpath(os.path.join(root, desired_part))
+                
+            result = re.search(r'\d+_\d+_(.*)', filenamebeforeanyperiods)
+            if result:
+                desired_part = result.group(1)
+                filenamebeforeanyperiods = os.path.normpath(os.path.join(root, desired_part))
 
             if originalfilenamebeforeanyperiods == filenamebeforeanyperiods:
                 print("filename matches prefix " + filenamebeforeanyperiods)
@@ -127,20 +138,23 @@ def get_lora_prompt(lora_path):
     base_name, ext = os.path.splitext(os.path.basename(lora_path))
     file_location = os.path.dirname(lora_path)
     jsonpath = os.path.join(file_location,(base_name + '.json'))
-    jsonpathasini = os.path.join(file_location,(base_name + '.civitai.info'))
+    civitaipath = os.path.join(file_location,(base_name + '.civitai.info'))
     combo = False
     trainedwords = False
     activation_text = False
     nfsw = False
     preferred_weight = False
 
-    if os.path.exists(jsonpathasini):
-        with open(jsonpathasini, 'r', encoding='utf-8') as file:
+    json_file_exists = False
+    civit_file_exists = False
+    if os.path.exists(civitaipath):
+        civit_file_exists = True
+        with open(civitaipath, 'r', encoding='utf-8') as file:
             data_civitai = json.load(file)
             modelid = data_civitai.get("modelId")
             id = data_civitai.get("id")
             if isinstance(modelid, (int, float)) and isinstance(id, (int, float)):
-                combo = str(modelid) + '_' + str(id)
+                combo = str(id) + '_' + str(modelid)
             else:
                 print("Invalid modelid or id for " + lora_path)
             trainedwords = data_civitai.get("trainedWords")
@@ -169,6 +183,7 @@ def get_lora_prompt(lora_path):
         print("no .civitai.info file for " + lora_path)
 
     if os.path.exists(jsonpath):
+        json_file_exists = True
         with open(jsonpath, 'r', encoding='utf-8') as file:
             data_json = json.load(file)
             # Extract the required fields from the JSON data_json
@@ -196,6 +211,8 @@ def get_lora_prompt(lora_path):
     else:
        print("no json file for " + lora_path)
 
+    if civit_file_exists == False and json_file_exists == False:
+        print("This shouldn't happen")
     if trainedwords == False and activation_text == False:
         print(lora_path + " no activation words")
         print(lora_path + " no activation words")
@@ -217,6 +234,9 @@ def main():
                 
                 if ret != False:
                     rename_file_grouping(fullpath,ret)
+                else:
+                    print(f"could not process the file {fullpath}.  No Civitai modelid  ")
+                    continue
                 #print ("actwrd1: " + str(type(actwrd1)) + "actwrd2: " + str(type(actwrd2)))
                 if actwrd1 != False and actwrd2 != False:
                     unique_elements = list(set(actwrd1 + actwrd2))
@@ -229,14 +249,6 @@ def main():
                     unique_elements = ['NOTRIGGER']
                 #write_to_log(log_file,f"{fullpath},{unique_elements}")
                 write_to_log(log_file,f"{fullpath},{','.join(unique_elements)}")
-                
-
-                
-                
-
-
-
-
 
 
 
