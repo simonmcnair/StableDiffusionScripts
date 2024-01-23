@@ -113,13 +113,14 @@ def get_models():
                         if file.get('type') =="Model":
                             write_to_log(successfile_path, "found LORA")
                             downloadurl = file.get('downloadUrl')
-
+                            unused1 = str(file.get('id'))
+                            lorafilename = file.get('name')
                             destination_folder = sanitise_filepath(os.path.join(Lora_download_to,DownloadLORASearch))
                             #downloadfilename = name + '_' + model + '_' + file.get('name')
-                            download_filename = str(model_id) + '_' + str(file.get('id')) + '_' + file.get('name')
+                            download_filename = f"{id}_{model_id}_{lorafilename}"
                             download_fullpath = sanitise_filepath(os.path.join(destination_folder,download_filename))
 
-                            downloadJSON_filename = str(model_id) + '_' + str(file.get('id')) + '_' + file.get('name') + '.json'
+                            downloadJSON_filename = f"{id}_{model_id}_{lorafilename}.json"
                             downloadJSON_fullpath = sanitise_filepath(os.path.join(destination_folder,downloadJSON_filename))
 
                             if not os.path.exists(destination_folder):
