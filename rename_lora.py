@@ -4,6 +4,7 @@ import json
 import os
 import re
 import shutil
+import time
 
 def get_script_name():
     # Use os.path.basename to get the base name (script name) from the full path
@@ -102,18 +103,18 @@ def rename_file_grouping(filepath, new_filename):
 
             result = re.search(r'\d+_\d+_\d+_\d+_(.*)', filenamebeforeanyperiods)
             if result:
-                desired_part = result.group(1)
-                filenamebeforeanyperiods = os.path.normpath(os.path.join(root, desired_part))
+                originalfilenamebeforeanyperiods = result.group(1)
+                #filenamebeforeanyperiods = os.path.normpath(os.path.join(root, desired_part))
                 
-            result = re.search(r'\d+_\d+_(.*)', filenamebeforeanyperiods)
+            result = re.search(r'\d+_\d+_(.*)', originalfilenamebeforeanyperiods)
             if result:
-                desired_part = result.group(1)
-                filenamebeforeanyperiods = os.path.normpath(os.path.join(root, desired_part))
+                originalfilenamebeforeanyperiods = result.group(1)
+                #filenamebeforeanyperiods = os.path.normpath(os.path.join(root, desired_part))
 
-            if originalfilenamebeforeanyperiods == filenamebeforeanyperiods:
+            if originalfilenamebeforeanyperiods in filenamebeforeanyperiods:
                 print("filename matches prefix " + filenamebeforeanyperiods)
                 # Create the new file path by joining the directory and new base filename with the original extension
-                new_filepath = os.path.normpath(os.path.join(root, new_filename + "_" + filenamebeforeanyperiods + "." + remainder))
+                new_filepath = os.path.normpath(os.path.join(root, new_filename + "_" + originalfilenamebeforeanyperiods + "." + remainder))
 
                 try:
                     # Rename the file
@@ -154,7 +155,7 @@ def get_lora_prompt(lora_path):
             modelid = data_civitai.get("modelId")
             id = data_civitai.get("id")
             if isinstance(modelid, (int, float)) and isinstance(id, (int, float)):
-                combo = str(id) + '_' + str(modelid)
+                combo = str(modelid) + '_' + str(id)
             else:
                 print("Invalid modelid or id for " + lora_path)
             trainedwords = data_civitai.get("trainedWords")
@@ -234,6 +235,7 @@ def main():
                 
                 if ret != False:
                     rename_file_grouping(fullpath,ret)
+                    #time.sleep(4)
                 else:
                     print(f"could not process the file {fullpath}.  No Civitai modelid  ")
                     continue

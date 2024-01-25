@@ -62,9 +62,10 @@ def get_models():
     qty = 10
     i = 0
     togglequit = False
+    headers = {}
     while True:
         # Make API request for the current page
-        headers = {'Content-Type': 'application/json'}
+        headers['Content-Type'] =  'application/json'
         params = {'page': page}
 
         while True:
@@ -128,7 +129,7 @@ def get_models():
                             if not os.path.exists(download_fullpath):
                                 write_to_log(logfile_path, "downloading " + downloadurl + ".  Filename: " + download_filename + ". size: " + str(file.get('sizeKB')))
                                 try:
-                                    response = requests.get(downloadurl)
+                                    response = requests.get(downloadurl, headers=headers)
                                 except Exception as e:
                                     write_to_log(logfile_path, "Error " + str(e))
 
