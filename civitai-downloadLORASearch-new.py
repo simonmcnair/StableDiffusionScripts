@@ -60,26 +60,29 @@ def get_models():
     global api_key
     global DownloadLORASearch
     # Initialize the first page
-    page = 1
     qty = 10
-    i = 0
     togglequit = False
-    headers = {}
-    while True:
-        # Make API request for the current page
-        headers['Content-Type'] =  'application/json'
-#        headers["Authorization"] = f"Bearer {api_key}"
 
-        params = {'page': page}
+#    modelsearch = f'https://civitai.com/api/v1/models?tag={DownloadLORASearch}&limit={qty}'
+#    modeltag = f'https://civitai.com/api/v1/models?limit={qty}&types=LORA&query={DownloadLORASearch}'
 
-        modelsearch = f'https://civitai.com/api/v1/models?tag={DownloadLORASearch}&limit={qty}'
-        modeltag = f'https://civitai.com/api/v1/models?limit={qty}&types=LORA&query={DownloadLORASearch}'
+    modelsearch = f'https://civitai.com/api/v1/models?tag={DownloadLORASearch}&limit={qty}&types=LORA'
+    modeltag = f'https://civitai.com/api/v1/models?limit={qty}&types=LORA&query={DownloadLORASearch}'
 
-        myarray = []
-        myarray.append(modelsearch)
-        myarray.append(modeltag)
+    myarray = []
+    myarray.append(modelsearch)
+    myarray.append(modeltag)
 
-        for eachsearch in myarray:
+    for eachsearch in myarray:
+        i = 0
+        page = 1
+        while True:
+            print(f"URL is {eachsearch}.  Page is {page}")
+
+            headers = {}
+            headers['Content-Type'] =  'application/json'
+
+            params = {'page': page}
             while True:
                 try:
                     response = requests.get(eachsearch,headers=headers, params=params)
@@ -101,7 +104,7 @@ def get_models():
                 else:
                     time.sleep(5)
                     write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
-    
+
             # Check if there are models in the response
             if 'items' in data:
                 # Extract 'id' field from each model and add it to the list
@@ -135,13 +138,19 @@ def get_models():
                                     os.makedirs(destination_folder)
 
                                 filesize_should_be = file.get('sizeKB')
-                                filesize_is = os
-                                if not os.path.exists(download_fullpath) and :
-                                    write_to_log(logfile_path, "downloading " + downloadurl + ".  Filename: " + download_filename + ". size: " + str())
+                                fileexists = False
+                                faileddownload = False
 
-                                    max_retries = 3
+                                if os.path.exists(download_fullpath):
+                                    filesize_is = os.path.getsize(download_fullpath)
+                                    fileexists = True
+                                    write_to_log(logfile_path, "File already exists")
 
-                                    for retry in range(max_retries):
+                                max_retries = 3
+                                download = True
+
+                                for retry in range(max_retries):
+                                    if download == True:
                                         if retry != 0:
                                             print(f"retrying: {retry}")
                                         with requests.get(downloadurl, headers=headers, stream=True) as response:
@@ -149,6 +158,17 @@ def get_models():
                                                 # The request was successful
                                                 file_size = int(response.headers.get("content-length", 0))
             
+                                                if file_size != filesize_is:
+                                                    faileddownload = True
+                                                    write_to_log(logfile_path, f"File is wrong size.  {filesize_is} and should be {file_size}.   Failed download.")
+                                                else:
+                                                    write_to_log(logfile_path, f"File is correct size ({filesize_is}).  Next..")
+                                                    download = False
+                                                    continue
+                                                    
+                                                write_to_log(logfile_path, "downloading " + downloadurl + ".  Filename: " + download_filename + ". size: " + str(filesize_should_be))
+
+
                                                 with open(download_fullpath, "wb") as file, tqdm(
                                                     desc="Downloading",
                                                     total=file_size,
@@ -165,7 +185,9 @@ def get_models():
                                                 print("Download complete.")
                                                 dump_to_json(submodel,downloadJSON_fullpath)
                                                 write_to_log(logfile_path, f"File downloaded successfully to {download_fullpath}")
-                                                write_to_log(successfile_path, f"{model},{downloadurl},{download_filename}")
+                                                write_to_log(successfile_path, f"Model: {model}.  URL: {downloadurl}.  Filename: {download_filename}")
+                                                download = False
+                                                continue
 
                                             elif response.status_code == 401 and api_key:
                                                 # Retry the request with the API key
@@ -174,8 +196,7 @@ def get_models():
                                             else:
                                                 # The request was not successful, handle the error
                                                 write_to_log(logfile_path, f"Failed to download file. Status code: {response.status_code}")
-                                else:
-                                    write_to_log(logfile_path, f"file {download_fullpath} already exists")
+
                             else:
                                 write_to_log(logfile_path, "file type is" + f": {file.get('type')}.  Filename: {file.get('name')}")
             else:
@@ -184,16 +205,18 @@ def get_models():
             #if togglequit == True:
             # break
             # Check if there are more pages
-            if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
-                print("lastpage")
+            if data['metadata'].get('currentPage') >= (data['metadata'].get('totalPages')):
+                #print("lastpage")
                 #togglequit = True
                 break
             else:
                 page += 1 
-
+    print("Finished")
 Lora_download_to = '/folder/to/download/to'
 DownloadLORASearch = 'Lora to search for'
 api_key = 'void'
+download_types = []
+download_types += ('Checkpoint', 'TextualInversion', 'MotionModule','Hypernetwork', 'AestheticGradient', 'LORA', 'LoCon','Controlnet', 'Upscaler','VAE','Poses','Wildcards','Other')
 
 apifile = os.path.join(get_script_path(), "apikey.py")
 
