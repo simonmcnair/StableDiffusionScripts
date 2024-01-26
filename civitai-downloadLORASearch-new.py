@@ -3,6 +3,8 @@ import time
 import os
 import json
 import re
+from tqdm import tqdm
+
 
 from pathlib import Path
 
@@ -66,122 +68,147 @@ def get_models():
     while True:
         # Make API request for the current page
         headers['Content-Type'] =  'application/json'
+#        headers["Authorization"] = f"Bearer {api_key}"
+
         params = {'page': page}
 
-        while True:
-            try:
-                est = f'https://civitai.com/api/v1/models?tag={DownloadLORASearch}&limit={qty}'
-                response = requests.get(est,headers=headers, params=params)
-                #est = f'https://civitai.com/api/v1/models?limit={qty}&types=LORA&query={DownloadLORASearch}'
-                #response = requests.get(f'https://civitai.com/api/v1/models?limit={qty}&types=LORA&query={DownloadLORASearch}', headers=headers, params=params)
-            except Exception as e:
-                 write_to_log(logfile_path, "Error " + str(e))
+        modelsearch = f'https://civitai.com/api/v1/models?tag={DownloadLORASearch}&limit={qty}'
+        modeltag = f'https://civitai.com/api/v1/models?limit={qty}&types=LORA&query={DownloadLORASearch}'
 
-            if response.status_code == 200:
+        myarray = []
+        myarray.append(modelsearch)
+        myarray.append(modeltag)
+
+        for eachsearch in myarray:
+            while True:
                 try:
-                    data = response.json()
+                    response = requests.get(eachsearch,headers=headers, params=params)
                 except Exception as e:
                     write_to_log(logfile_path, "Error " + str(e))
-                break
-            elif response.status_code == 401 and api_key:
-                # Retry the request with the API key
-                headers["Authorization"] = f"Bearer {api_key}"
-                response = requests.get(f'https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}', headers=headers, params=params)
-            elif "be back in a few minutes" in str(response.content):
-                print("error.  Site down")
-                exit()    
-            else:
-                 time.sleep(5)
-                 write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
- 
-        # Check if there are models in the response
-        if 'items' in data:
-            # Extract 'id' field from each model and add it to the list
-            totalcnt = data['metadata'].get('totalItems')
-            write_to_log(logfile_path, "totalcnt = " + str(totalcnt))
-            write_to_log(logfile_path, "page = " + str(data['metadata'].get('currentPage')) + " of #" + str(data['metadata'].get('totalPages')))
-            for each in data['items']:
-                i += 1
-                id = each.get('id')
-                name = each.get('name')
-                write_to_log(logfile_path, "processing #" + str(i) + " of " + str(totalcnt) + " " + str(id) + f" ({name})")
 
-                for each1 in each['modelVersions']:
-                    model = each1.get('name')
-                    model_id = each1.get('id')
-                    for file in each1['files']:
-                        if file.get('type') =="Model":
-                            write_to_log(successfile_path, "found LORA")
-                            downloadurl = file.get('downloadUrl')
-                            unused1 = str(file.get('id'))
-                            lorafilename = file.get('name')
-                            destination_folder = sanitise_filepath(os.path.join(Lora_download_to,DownloadLORASearch))
-                            #downloadfilename = name + '_' + model + '_' + file.get('name')
-                            download_filename = f"{id}_{model_id}_{lorafilename}"
-                            download_fullpath = sanitise_filepath(os.path.join(destination_folder,download_filename))
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                    except Exception as e:
+                        write_to_log(logfile_path, "Error " + str(e))
+                    break
+                elif response.status_code == 401 and api_key:
+                    # Retry the request with the API key
+                    headers["Authorization"] = f"Bearer {api_key}"
+                elif "be back in a few minutes" in str(response.content):
+                    print("error.  Site down")
+                    exit()    
+                else:
+                    time.sleep(5)
+                    write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
+    
+            # Check if there are models in the response
+            if 'items' in data:
+                # Extract 'id' field from each model and add it to the list
+                totalcnt = data['metadata'].get('totalItems')
+                write_to_log(logfile_path, "totalcnt = " + str(totalcnt))
+                write_to_log(logfile_path, "page = " + str(data['metadata'].get('currentPage')) + " of #" + str(data['metadata'].get('totalPages')))
+                for eachitem in data['items']:
+                    i += 1
+                    id = eachitem.get('id')
+                    name = eachitem.get('name')
+                    write_to_log(logfile_path, "processing #" + str(i) + " of " + str(totalcnt) + " " + str(id) + f" ({name})")
 
-                            downloadJSON_filename = f"{id}_{model_id}_{lorafilename}.json"
-                            downloadJSON_fullpath = sanitise_filepath(os.path.join(destination_folder,downloadJSON_filename))
+                    for submodel in eachitem['modelVersions']:
+                        model = submodel.get('name')
+                        model_id = submodel.get('id')
+                        for file in submodel['files']:
+                            if file.get('type') =="Model":
+                                write_to_log(successfile_path, f"found submodel LORA: {model}")
+                                downloadurl = file.get('downloadUrl')
+                                unused1 = str(file.get('id'))
+                                lorafilename = file.get('name')
+                                destination_folder = sanitise_filepath(os.path.join(Lora_download_to,DownloadLORASearch))
+                                #downloadfilename = name + '_' + model + '_' + file.get('name')
+                                download_filename = f"{id}_{model_id}_{lorafilename}"
+                                download_fullpath = sanitise_filepath(os.path.join(destination_folder,download_filename))
 
-                            if not os.path.exists(destination_folder):
-                                os.makedirs(destination_folder)
+                                downloadJSON_filename = f"{id}_{model_id}_{lorafilename}.json"
+                                downloadJSON_fullpath = sanitise_filepath(os.path.join(destination_folder,downloadJSON_filename))
 
-                            if not os.path.exists(download_fullpath):
-                                write_to_log(logfile_path, "downloading " + downloadurl + ".  Filename: " + download_filename + ". size: " + str(file.get('sizeKB')))
-                                try:
-                                    response = requests.get(downloadurl, headers=headers)
-                                except Exception as e:
-                                    write_to_log(logfile_path, "Error " + str(e))
+                                if not os.path.exists(destination_folder):
+                                    os.makedirs(destination_folder)
 
-                                if response.status_code == 401 and api_key:
-                                    # Retry the request with the API key
-                                    headers["Authorization"] = f"Bearer {api_key}"
-                                    response = requests.get(downloadurl, headers=headers)
+                                filesize_should_be = file.get('sizeKB')
+                                filesize_is = os
+                                if not os.path.exists(download_fullpath) and :
+                                    write_to_log(logfile_path, "downloading " + downloadurl + ".  Filename: " + download_filename + ". size: " + str())
 
-                                if response.status_code == 200:
-                                    with open(download_fullpath, 'wb') as file2:
-                                        file2.write(response.content)
+                                    max_retries = 3
 
-                                    dump_to_json(each1,downloadJSON_fullpath)
-                                    write_to_log(logfile_path, f"File downloaded successfully to {download_fullpath}")
-                                    write_to_log(successfile_path, f"{model},{downloadurl},{download_filename}")
+                                    for retry in range(max_retries):
+                                        if retry != 0:
+                                            print(f"retrying: {retry}")
+                                        with requests.get(downloadurl, headers=headers, stream=True) as response:
+                                            if response.status_code == 200:
+                                                # The request was successful
+                                                file_size = int(response.headers.get("content-length", 0))
+            
+                                                with open(download_fullpath, "wb") as file, tqdm(
+                                                    desc="Downloading",
+                                                    total=file_size,
+                                                    unit="B",
+                                                    unit_scale=True,
+                                                    unit_divisor=1024,
+                                                ) as bar:
+                                                    # Iterate over the content in chunks and write to the file
+                                                    for chunk in response.iter_content(chunk_size=8192):  # You can adjust the chunk size
+                                                        if chunk:
+                                                            #print("chunk")
+                                                            file.write(chunk)
+                                                            bar.update(len(chunk))
+                                                print("Download complete.")
+                                                dump_to_json(submodel,downloadJSON_fullpath)
+                                                write_to_log(logfile_path, f"File downloaded successfully to {download_fullpath}")
+                                                write_to_log(successfile_path, f"{model},{downloadurl},{download_filename}")
+
+                                            elif response.status_code == 401 and api_key:
+                                                # Retry the request with the API key
+                                                headers["Authorization"] = f"Bearer {api_key}"
+                                                print("request denied.  Adding auth header")
+                                            else:
+                                                # The request was not successful, handle the error
+                                                write_to_log(logfile_path, f"Failed to download file. Status code: {response.status_code}")
                                 else:
-                                    write_to_log(logfile_path, f"Failed to download file. Status code: {response.status_code}")
+                                    write_to_log(logfile_path, f"file {download_fullpath} already exists")
                             else:
-                                write_to_log(logfile_path, "file already exists")
-                        else:
-                            write_to_log(logfile_path, "file type is" + f": {file.get('type')}.  Filename: {file.get('name')}")
-        else:
-            print("no items returned")
+                                write_to_log(logfile_path, "file type is" + f": {file.get('type')}.  Filename: {file.get('name')}")
+            else:
+                print("no items returned")
 
-        #if togglequit == True:
-           # break
-        # Check if there are more pages
-        if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
-            print("lastpage")
-            #togglequit = True
-            break
-        else:
-            page += 1 
+            #if togglequit == True:
+            # break
+            # Check if there are more pages
+            if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
+                print("lastpage")
+                #togglequit = True
+                break
+            else:
+                page += 1 
 
 Lora_download_to = '/folder/to/download/to'
 DownloadLORASearch = 'Lora to search for'
-
+api_key = 'void'
 
 apifile = os.path.join(get_script_path(), "apikey.py")
-if os.path.exists(apifile):
-    exec(open(apifile).read())
-    api_key = apikey
-    print("API Key:", api_key)
-else:
+
+
+try:
+    from apikey import api_key
+    print("apikey found" + api_key)
+except ImportError:
     print("apikey.py not found in the current directory.")
+
 
 localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
-    #api_key = apikey
-    #print("API Key:", api_key)
 else:
     print("No local overrides.")
 
