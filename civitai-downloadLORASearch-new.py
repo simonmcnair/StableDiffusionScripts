@@ -21,7 +21,7 @@ def sanitise_folder_name(folder_name):
 def sanitise_filepath(filepath,replacewith=''):
     # Define the set of invalid characters in Windows and Linux file paths
     filepath = filepath.replace('\\','/')
-    invalid_characters = set(['<', '>', '"', '\\','|', '?', '*',' ','-'])
+    invalid_characters = set(['<', '>', '"', '\\','|', '?', '*',' '])
 
     # Replace or remove invalid characters
     sanitised_filepath = ''.join(char if char not in invalid_characters else replacewith for char in filepath)
@@ -218,12 +218,14 @@ def get_models():
 
             print("Finished")
 
-search_terms = []
-download_types = []
 
 Lora_download_to = '/folder/to/download/to'
-search_terms += ('Lora to search for')
 api_key = 'void'
+
+search_terms = []
+search_terms += ('Lora to search for')
+
+download_types = []
 download_types += ('Checkpoint', 'TextualInversion', 'MotionModule','Hypernetwork', 'AestheticGradient', 'LORA', 'LoCon','Controlnet', 'Upscaler','VAE','Poses','Wildcards','Other')
 
 apifile = os.path.join(get_script_path(), "apikey.py")
