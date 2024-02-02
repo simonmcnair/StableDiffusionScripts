@@ -80,37 +80,23 @@ def move_file_to_fixedfolder(filepath, folder,keyword):
     except Exception as e:
         print(f"Error moving '{filepath}' to '{destination}': {str(e)}")
 
-# Search for files containing a specific string
-def search_and_move_files(searchdirectory, search_string, foldername,dest=False, ):
-    print("searching " + searchdirectory)
-    print("destination " + str(dest))
-    print("Moving to " + foldername)
-    print("Search term" + str(search_string))
-
-    if isinstance(search_string, str):
-        print("It's a string!")
-        if ',' in search_string:
-           terms = search_string.split(',')
-        else:
-           terms = list(search_string)
-    elif isinstance(search_string, dict):
-        print("It's a dictionary!")
-        return None
-        # Perform dictionary-related actions
-    elif isinstance(search_string, list):
-        print("It's a list!")
-        terms = search_string
-
-    #make the list lowercase
-    terms = [item.lower() for item in terms]
+def find_folder_for_term(search_data,term):
+    for entry in search_data:
+        if term in entry["terms"]:
+            return entry["folder"], entry["Move_to_subfolder"]
+    return None  # Return None if the term is not found in any entry
 
 
-    if dest != False:
-        movetofixedfolder = True
-    else:
-        movetofixedfolder = False
+def search_and_move_files(search_term_array,foldertoSearch):
 
-    for root, dirs, files in os.walk(searchdirectory):
+    all_search_terms = [term for entry in search_term_array for term in entry["terms"]]
+
+      
+    print("searching " + foldertoSearch)
+
+
+
+    for root, dirs, files in os.walk(foldertoSearch):
         for file in files:
             print("processing " + file)
             file_path = os.path.join(root, file)
@@ -118,17 +104,27 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
                 continue
             hasparameters = False
             found = False
-            for term in terms:
-                if term.lower() in file:
+            checkfilename = False
+            for search_term in all_search_terms:
+                if search_term.lower() in file:
                     print('search term exists in filename')
-                    if movetofixedfolder == True:
-                        move_file_to_fixedfolder(file_path,dest ,foldername)
-                        found = True
-                        continue
+
+                    keyword, foldername = find_folder_for_term(search_term_array,search_term)
+
+                    if keyword != False:
+                        movetofixedfolder = True
                     else:
-                        move_file_to_subfolder(file_path, foldername)
-                        found = True
-                        continue
+                        movetofixedfolder = False
+
+                    if checkfilename == True:
+                        if movetofixedfolder == True:
+                            move_file_to_fixedfolder(file_path,foldername,keyword)
+                            found = True
+                            continue
+                        else:
+                            move_file_to_subfolder(file_path, foldername)
+                            found = True
+                            continue
             
             if found == False:
                 print("Terms did not exist in filename.  Checking params for " + file)
@@ -150,37 +146,52 @@ def search_and_move_files(searchdirectory, search_string, foldername,dest=False,
 
                 if hasparameters ==True:
                     #if any(terms) in parameter:
-                    for term in terms:
+                    for search_term in all_search_terms:
                     #if any(term in parameter for term in terms):
-                        if term.lower() in parameter:
+                        if search_term.lower() in parameter:
                             print(parameter)
-                            print(f"Found '{term}' in parameters for : {file_path}")
+                            print(f"Found '{search_term}' in parameters for : {file_path}")
+
+                            keyword, foldername = find_folder_for_term(search_term_array,search_term)
+
+                            if keyword != False:
+                                movetofixedfolder = True
+                            else:
+                                movetofixedfolder = False
+
                             #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
                             #if user_input == 'y':
+
                             if movetofixedfolder == True:
-                                move_file_to_fixedfolder(file_path,dest ,foldername)
+                                move_file_to_fixedfolder(file_path ,foldername,keyword)
                             else:
                                 move_file_to_subfolder(file_path, foldername)
-                        else:
-                            print(term + " not found in parameters for " + file_path)
+
+                        #else:
+                        #    print(search_term + " not found in parameters for " + file_path)
 
                 else:
                     print("no parameters.  Skipping")
                     continue
 
+
 # Directory to search
 search_directory =  '/path/to/search'
 destination =  '/folder/to/move/to'
-search_string = 'searchterm'
-search_term_folder = 'foldertogroupunder'
 
-apifile = os.path.join(get_script_path(), "apikey.py")
-if os.path.exists(apifile):
-    exec(open(apifile).read())
-    api_key = apikey
-    print("API Key:", api_key)
-else:
-    print("apikey.py not found in the current directory.")
+#move_to_subfolder should be the directory you want it moving to.  If set to False it will put it in a subdirectory of the current folder
+search_data = [
+    {"terms": ['searchforthis'],
+     "folder": "move searchforthis to here",
+     "Move_to_subfolder": destination},
+    {"terms": ["searchforthistoo"],
+     "folder": "move searchforthistoo to here",
+     "Move_to_subfolder": destination},
+    {"terms": ['also search for this'],
+     "folder": 'move also search for this to here',
+     "Move_to_subfolder": destination}
+    # Add more search terms and folders as needed
+]
 
 localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
 
@@ -191,4 +202,4 @@ if os.path.exists(localoverridesfile):
 else:
     print("No local overrides.")
 
-search_and_move_files(search_directory, search_string, search_term_folder, destination)
+search_and_move_files(search_data,search_directory)
