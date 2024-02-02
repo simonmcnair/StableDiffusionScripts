@@ -5,8 +5,13 @@ import json
 import re
 from tqdm import tqdm
 from itertools import product
+import platform
 
 from pathlib import Path
+
+def get_operating_system():
+    system = platform.system()
+    return system
 
 def sanitise_folder_name(folder_name):
     # Define a regular expression pattern to match invalid characters
@@ -163,12 +168,25 @@ def rename_files():
 
 search_folder = '/folder/to/download/to'
 
-localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
+current_os = get_operating_system()
+
+if current_os == "Windows":
+    print("Running on Windows")
+elif current_os == "Linux":
+    print("Running on Linux")
+
+localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '_' + current_os + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
+    #api_key = apikey
+    #print("API Key:", api_key)
+    print("local override file is " + localoverridesfile)
+
 else:
-    print("No local overrides.")
+    print("local override file would be " + localoverridesfile)
+
+
 
 logfile_path = os.path.join(search_folder,'logfile.log')
 

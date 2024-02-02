@@ -11,6 +11,7 @@ from collections import Counter
 import shutil
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+import platform
 
 #python3.11 -m venv venv
 #source ./venv/bin/activate
@@ -32,6 +33,9 @@ def get_script_name():
 def get_script_path():
     return os.path.dirname(os.path.realpath(__file__))
 
+def get_operating_system():
+    system = platform.system()
+    return system
 
 def write_to_log(log_file, message):
     global debug
@@ -940,14 +944,25 @@ if useapikey == True:
     if os.path.exists(apifile):
         import apifile
 
-localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
+current_os = get_operating_system()
+
+if current_os == "Windows":
+    print("Running on Windows")
+elif current_os == "Linux":
+    print("Running on Linux")
+
+localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '_' + current_os + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
     #api_key = apikey
     #print("API Key:", api_key)
+    print("local override file is " + localoverridesfile)
+
 else:
-    print("No local overrides.")
+    print("local override file would be " + localoverridesfile)
+
+
 
 
 log_file = os.path.join(get_script_path(),get_script_name() + '.log')

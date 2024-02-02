@@ -5,9 +5,14 @@ import json
 import re
 from tqdm import tqdm
 from itertools import product
+import platform
 
 
 from pathlib import Path
+
+def get_operating_system():
+    system = platform.system()
+    return system
 
 def sanitise_folder_name(folder_name):
     # Define a regular expression pattern to match invalid characters

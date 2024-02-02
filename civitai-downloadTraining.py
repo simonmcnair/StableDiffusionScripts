@@ -3,6 +3,11 @@ import time
 import os
 from pathlib import Path
 import json
+import platform
+
+def get_operating_system():
+    system = platform.system()
+    return system
 
 def dump_to_json(data, filename):
     """
@@ -171,14 +176,25 @@ if os.path.exists(apifile):
 else:
     print("apikey.py not found in the current directory.")
 
-localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
+current_os = get_operating_system()
+
+if current_os == "Windows":
+    print("Running on Windows")
+elif current_os == "Linux":
+    print("Running on Linux")
+
+localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '_' + current_os + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
     #api_key = apikey
     #print("API Key:", api_key)
+    print("local override file is " + localoverridesfile)
+
 else:
-    print("No local overrides.")
+    print("local override file would be " + localoverridesfile)
+
+
 
 logfile_path = os.path.join(download_to,'logfile.log')
 successfile_path = os.path.join(download_to,'successfile.log')

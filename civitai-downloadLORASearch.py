@@ -3,9 +3,14 @@ import time
 import os
 import json
 import re
+import platform
 
 from pathlib import Path
 
+def get_operating_system():
+    system = platform.system()
+    return system
+    
 def sanitise_folder_name(folder_name):
     # Define a regular expression pattern to match invalid characters
     invalid_chars_pattern = re.compile(r'[\\/:"*?<>|]')
@@ -175,14 +180,25 @@ if os.path.exists(apifile):
 else:
     print("apikey.py not found in the current directory.")
 
-localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
+current_os = get_operating_system()
+
+if current_os == "Windows":
+    print("Running on Windows")
+elif current_os == "Linux":
+    print("Running on Linux")
+
+localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '_' + current_os + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
     #api_key = apikey
     #print("API Key:", api_key)
+    print("local override file is " + localoverridesfile)
+
 else:
-    print("No local overrides.")
+    print("local override file would be " + localoverridesfile)
+
+
 
 logfile_path = os.path.join(Lora_download_to,'logfile.log')
 

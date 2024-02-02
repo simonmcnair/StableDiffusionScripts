@@ -3,8 +3,11 @@
 from pathlib import Path
 import os
 import exiftool
+import platform
 
-
+def get_operating_system():
+    system = platform.system()
+    return system
         
 def get_script_name():
     # Use os.path.basename to get the base name (script name) from the full path
@@ -52,12 +55,25 @@ def test(filetoproc):
 
 
 imagefile = '/path/to/test.jpg'
-localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
+current_os = get_operating_system()
+
+if current_os == "Windows":
+    print("Running on Windows")
+elif current_os == "Linux":
+    print("Running on Linux")
+
+localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '_' + current_os + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
+    #api_key = apikey
+    #print("API Key:", api_key)
+    print("local override file is " + localoverridesfile)
+
 else:
-    print("No local overrides.")
+    print("local override file would be " + localoverridesfile)
+
+
 
 test(imagefile)
 
