@@ -393,6 +393,7 @@ else:
                     
                     for each in modelarray:
 
+                        print("using: " + each)
 
                         from PIL import Image
                         from clip_interrogator import Config, Interrogator
