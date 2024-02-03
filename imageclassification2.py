@@ -26,7 +26,7 @@ import os
 #import glob
 from PIL.ExifTags import TAGS
 from PIL import Image, ImageTk
-from clip_interrogator import Config, Interrogator
+from clip_interrogator import Config, Interrogator, list_clip_models
 import platform
 
 import re
@@ -251,7 +251,15 @@ class ImageTextDisplay:
         # Initial display
         self.show_current()
 
-
+    def inference(ci, image, mode):
+        image = image.convert('RGB')
+        if mode == 'best':
+            return ci.interrogate(image)
+        elif mode == 'classic':
+            return ci.interrogate_classic(image)
+        else:
+            return ci.interrogate_fast(image)
+    
     def apply_interrogation(self):
         if self.image_text_list:
             image_path, text_set = self.image_text_list[self.current_index]
@@ -404,15 +412,23 @@ else:
                 try:
                     fullpath = os.path.join(root,filename)
                     
+
+                    
                     for each in modelarray:
 
                         print("using: " + each)
 
-                        from PIL import Image
-                        from clip_interrogator import Config, Interrogator
+                        config = Config(clip_model_name=each)
+                        config.apply_low_vram_defaults()
+
+                        ci = Interrogator(config)
+                        #from PIL import Image
+                        #from clip_interrogator import Config, Interrogator
                         image = Image.open(fullpath).convert('RGB')
-                        ci = Interrogator(Config(clip_model_name=each))
-                        print(ci.interrogate(image))
+                        #prompt = inference(ci, image, Config(clip_model_name=each,mode='fast'))
+
+                        #print(prompt)
+                        print(ci.interrogate_fast(image))
 
                     
 
