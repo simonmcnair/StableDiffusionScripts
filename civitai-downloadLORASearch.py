@@ -60,7 +60,7 @@ def dump_to_json(data, filename):
 
 def get_models():
 
-    global api_key
+    global apikey
     global DownloadLORASearch
     # Initialize the first page
     page = 1
@@ -83,9 +83,9 @@ def get_models():
                 print("error.  Site down")
                 exit()
 
-            if response.status_code == 401 and api_key:
+            if response.status_code == 401 and apikey:
                 # Retry the request with the API key
-                headers["Authorization"] = f"Bearer {api_key}"
+                headers["Authorization"] = f"Bearer {apikey}"
                 response = requests.get(f'https://civitai.com/api/v1/models?limit=10&types=LORA&query={DownloadLORASearch}', headers=headers, params=params)
 
                 
@@ -138,9 +138,9 @@ def get_models():
                                 except Exception as e:
                                     write_to_log(logfile_path, "Error " + str(e))
 
-                                if response.status_code == 401 and api_key:
+                                if response.status_code == 401 and apikey:
                                     # Retry the request with the API key
-                                    headers["Authorization"] = f"Bearer {api_key}"
+                                    headers["Authorization"] = f"Bearer {apikey}"
                                     response = requests.get(downloadurl, headers=headers)
 
                                 if response.status_code == 200:
@@ -175,8 +175,8 @@ DownloadLORASearch = 'Lora to search for'
 apifile = os.path.join(get_script_path(), "apikey.py")
 if os.path.exists(apifile):
     exec(open(apifile).read())
-    api_key = apikey
-    print("API Key:", api_key)
+    apikey = apikey
+    print("API Key:", apikey)
 else:
     print("apikey.py not found in the current directory.")
 
@@ -191,8 +191,8 @@ localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
-    #api_key = apikey
-    #print("API Key:", api_key)
+    #apikey = apikey
+    #print("API Key:", apikey)
     print("local override file is " + localoverridesfile)
 
 else:

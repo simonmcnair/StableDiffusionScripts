@@ -39,7 +39,7 @@ def write_to_log(log_file, message):
 
 def get_models():
 
-    global api_key
+    global apikey
     # Initialize the first page
     page = 1
     batchsize = 100
@@ -48,8 +48,8 @@ def get_models():
         # Make API request for the current page
         headers = {'Content-Type': 'application/json'}
 
-#        if api_key:
-#            headers["Authorization"] = f"Bearer {api_key}"
+#        if apikey:
+#            headers["Authorization"] = f"Bearer {apikey}"
 
         params = {'page': page}
         print("processing page " + str(page))
@@ -68,9 +68,9 @@ def get_models():
             if response.status_code == 404:
                 print("not found")
                 break
-            if response.status_code == 401 and api_key:
+            if response.status_code == 401 and apikey:
                 # Retry the request with the API key
-                headers["Authorization"] = f"Bearer {api_key}"
+                headers["Authorization"] = f"Bearer {apikey}"
                 response = requests.get(req, headers=headers, params=params)
 
             if response.status_code == 200:
@@ -135,9 +135,9 @@ def get_models():
                                         print("404 file not found")
                                         break
 
-                                    if response.status_code == 401 and api_key:
+                                    if response.status_code == 401 and apikey:
                                         # Retry the request with the API key
-                                        headers["Authorization"] = f"Bearer {api_key}"
+                                        headers["Authorization"] = f"Bearer {apikey}"
                                         response = requests.get(downloadurl, headers=headers)
 
                                     if response.status_code == 200:
@@ -171,8 +171,8 @@ download_to = '/folder/to/download/to'
 apifile = os.path.join(get_script_path(), "apikey.py")
 if os.path.exists(apifile):
     exec(open(apifile).read())
-    api_key = apikey
-    print("API Key:", api_key)
+    apikey = apikey
+    print("API Key:", apikey)
 else:
     print("apikey.py not found in the current directory.")
 
@@ -187,8 +187,8 @@ localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
-    #api_key = apikey
-    #print("API Key:", api_key)
+    #apikey = apikey
+    #print("API Key:", apikey)
     print("local override file is " + localoverridesfile)
 
 else:

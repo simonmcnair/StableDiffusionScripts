@@ -59,7 +59,7 @@ def extract_url_cursor(url):
 #@sleep(3)
 def get_models():
 
-    global api_key
+    global apikey
     global UserToDL
     global prompt_file_location
     # Initialize the first page
@@ -72,7 +72,7 @@ def get_models():
     #cursor = "1"
     headers = {}
     headers['Content-Type'] = 'application/json'
-    #headers["Authorization"] = f"Bearer {api_key}"
+    #headers["Authorization"] = f"Bearer {apikey}"
 
     params = {
         'limit' : limit,
@@ -95,7 +95,7 @@ def get_models():
                 time.sleep(throttletime)
 
             try:
-                #https://civitai.com/api/v1/models?token={api_key}
+                #https://civitai.com/api/v1/models?token={apikey}
                 req = f'https://civitai.com/api/v1/images?tag={UserToDL}'
                 #req = f'https://civitai.com/api/v1/images?username={UserToDL}&page={page}'
                 
@@ -131,9 +131,9 @@ def get_models():
                 print("not found")
                 break
 
-            elif response.status_code == 401 and api_key:
+            elif response.status_code == 401 and apikey:
                 # Retry the request with the API key
-                headers["Authorization"] = f"Bearer {api_key}"
+                headers["Authorization"] = f"Bearer {apikey}"
                 response = requests.get(req, headers=headers, params=params)
             
             elif response.status_code == 429:
@@ -190,8 +190,8 @@ prompt_file_location = '/folder/to/download/to.txt'
 apifile = os.path.join(get_script_path(), "apikey.py")
 if os.path.exists(apifile):
     exec(open(apifile).read())
-    api_key = apikey
-    print("API Key:", api_key)
+    apikey = apikey
+    print("API Key:", apikey)
 else:
     print("apikey.py not found in the current directory.")
 
@@ -206,8 +206,8 @@ localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
-    #api_key = apikey
-    #print("API Key:", api_key)
+    #apikey = apikey
+    #print("API Key:", apikey)
     print("local override file is " + localoverridesfile)
 
 else:

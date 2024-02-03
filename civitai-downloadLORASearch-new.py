@@ -64,7 +64,7 @@ def dump_to_json(data, filename):
 def get_models():
     global search_terms
     global download_types
-    global api_key
+    global apikey
 
     for searchterm, download_type, in product(search_terms, download_types):        
             # Initialize the first page
@@ -105,9 +105,9 @@ def get_models():
                             except Exception as e:
                                 write_to_log(logfile_path, "Error " + str(e))
                             break
-                        elif response.status_code == 401 and api_key:
+                        elif response.status_code == 401 and apikey:
                             # Retry the request with the API key
-                            headers["Authorization"] = f"Bearer {api_key}"
+                            headers["Authorization"] = f"Bearer {apikey}"
                         elif "be back in a few minutes" in str(response.content):
                             print("error.  Site down")
                             exit()    
@@ -156,7 +156,7 @@ def get_models():
                                             fileexists = True
                                             write_to_log(logfile_path, "File already exists")
 
-                                        max_retries = 3
+                                        max_retries = 6
                                         download = True
 
                                         for retry in range(max_retries):
@@ -198,10 +198,14 @@ def get_models():
                                                         download = False
                                                         continue
 
-                                                    elif response.status_code == 401 and api_key:
+                                                    elif retry == max_retries and response.status_code == 401:
+                                                        print(f"Error {response.status_code}")
+                                                    
+                                                    elif response.status_code == 401 and apikey:
                                                         # Retry the request with the API key
-                                                        headers["Authorization"] = f"Bearer {api_key}"
+                                                        headers["Authorization"] = f"Bearer {apikey}"
                                                         print("request denied.  Adding auth header")
+
                                                     else:
                                                         # The request was not successful, handle the error
                                                         write_to_log(logfile_path, f"Failed to download file. Status code: {response.status_code}")
@@ -225,7 +229,7 @@ def get_models():
 
 
 Lora_download_to = '/folder/to/download/to'
-api_key = 'void'
+apikey = 'void'
 
 search_terms = []
 search_terms += ('Lora to search for')
@@ -237,18 +241,29 @@ apifile = os.path.join(get_script_path(), "apikey.py")
 
 
 try:
-    from apikey import api_key
-    print("apikey found" + api_key)
+    from apikey import apikey
+    print("apikey found" + apikey)
 except ImportError:
     print("apikey.py not found in the current directory.")
 
 
-localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '.py')
+current_os = get_operating_system()
+
+if current_os == "Windows":
+    print("Running on Windows")
+elif current_os == "Linux":
+    print("Running on Linux")
+
+localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '_' + current_os + '.py')
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
+    #apikey = apikey
+    #print("API Key:", apikey)
+    print("local override file is " + localoverridesfile)
+
 else:
-    print("No local overrides.")
+    print("local override file would be " + localoverridesfile)
 
 logfile_path = os.path.join(Lora_download_to,'logfile.log')
 

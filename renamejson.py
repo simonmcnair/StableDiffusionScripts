@@ -179,8 +179,8 @@ localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
-    #api_key = apikey
-    #print("API Key:", api_key)
+    #apikey = apikey
+    #print("API Key:", apikey)
     print("local override file is " + localoverridesfile)
 
 else:
