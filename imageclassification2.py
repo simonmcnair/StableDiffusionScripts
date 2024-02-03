@@ -28,6 +28,7 @@ from PIL.ExifTags import TAGS
 from PIL import Image, ImageTk
 from clip_interrogator import Config, Interrogator, list_clip_models
 import platform
+from transformers import BlipProcessor, BlipForConditionalGeneration
 
 import re
 #import threading
@@ -412,24 +413,19 @@ else:
                 try:
                     fullpath = os.path.join(root,filename)
                     
-
-                    
-                    for each in modelarray:
+                    for each,desc in modelarray.items():
 
                         print("using: " + each)
 
-                        config = Config(clip_model_name=each)
-                        config.apply_low_vram_defaults()
+                        processor = BlipProcessor.from_pretrained(desc)
+                        model = BlipForConditionalGeneration.from_pretrained(desc)
 
-                        ci = Interrogator(config)
-                        #from PIL import Image
-                        #from clip_interrogator import Config, Interrogator
                         image = Image.open(fullpath).convert('RGB')
-                        #prompt = inference(ci, image, Config(clip_model_name=each,mode='fast'))
 
-                        #print(prompt)
-                        print(ci.interrogate_fast(image))
+                        inputs = processor(image, return_tensors="pt")
 
+                        out = model.generate(**inputs)
+                        print(f"{fullpath} {processor.decode(out[0], skip_special_tokens=True)}")
                     
 
                     break
