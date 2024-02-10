@@ -401,12 +401,13 @@ else:
                 #'ViT-H-14': 'ViT-H-14/laion2b_s32b_b79',
        #         'ViT-H-14': 'laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
                 #'wd14': 'wd14-convnext',
-                'wd14': 'saltacc/wd-1-4-anime',
-                'blip-base': 'Salesforce/blip-image-captioning-base',   # 990MB
+        #        'wd14': 'saltacc/wd-1-4-anime',
+                'wd' : 'SmilingWolf/wd-v1-4-vit-tagger-v2',
+       #         'blip-base': 'Salesforce/blip-image-captioning-base',   # 990MB
        #         'blip-large': 'Salesforce/blip-image-captioning-large', # 1.9GB
             #    'blip2-2.7b': 'Salesforce/blip2-opt-2.7b',              # 15.5GB
             #    'blip2-flan-t5-xl': 'Salesforce/blip2-flan-t5-xl',      # 15.77GB
-                'git-large-coco': 'microsoft/git-large-coco'           # 1.58GB
+        #        'git-large-coco': 'microsoft/git-large-coco'           # 1.58GB
                 }
 
     for root, dirs, files in os.walk(defaultdir):

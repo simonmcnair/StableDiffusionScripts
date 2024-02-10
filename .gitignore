@@ -162,3 +162,4 @@ apikey.py
 localoverridesfile*.py
 .safetensors
 cache/*
+output.json

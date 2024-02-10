@@ -235,9 +235,16 @@ def get_lora_prompt(lora_path):
                     trainedwords = [word.strip() for word in trainedwords[0].split(',')]
 
             nfsw = data_civitai.get("model", {}).get("nsfw", None)
+            files = data_civitai.get("files")
+            if len(files) == 1:
+                size = files[0].get('sizeKB',None)
+                result = os.path.getsize(lora_path)/1024
+                if size != result:
+                    print(f"wrong size ! {lora_path}" )
 
             if get_checksums == True:
                 print("getting checksums")
+                pass
                 checksums = data_civitai.get("trainedWords")
 
     else:
@@ -296,6 +303,10 @@ def main():
                 if ret != False and rename_Loras == True:
                     rename_file_grouping(fullpath,ret)
                     #time.sleep(4)
+                elif rename_Loras == False:
+                    print("renaming Lora disabled")
+                elif ret == False:
+                    print("Not enough information to rename Lora")
                 else:
                     print(f"could not process the file {fullpath}.  No Civitai modelid  ")
                     continue
@@ -319,16 +330,16 @@ def main():
 
 
 root_directory = '/file/to/sort/'
-useapikey = False
+useapikey = True
 rename_Loras = False
-create_activation = True
+create_activation = False
 get_checksums = True
 
 if useapikey == True:
     #unused here
     apifile = os.path.join(get_script_path(),"apikey.py")
     if os.path.exists(apifile):
-        import apifile
+        import apikey
 
 current_os = get_operating_system()
 
@@ -347,7 +358,6 @@ if os.path.exists(localoverridesfile):
 
 else:
     print("local override file would be " + localoverridesfile)
-
 
 
 debug = True

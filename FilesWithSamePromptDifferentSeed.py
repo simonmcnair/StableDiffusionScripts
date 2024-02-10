@@ -12,6 +12,7 @@ import shutil
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 import platform
+import json
 
 #python3.11 -m venv venv
 #source ./venv/bin/activate
@@ -372,74 +373,127 @@ def remove_spaces_around_comma(input_string):
     
     return result_string
 
-def properwaytogetPromptfield(mystr,fieldtoretrieve=''):
+def unquote(text):
+    if len(text) == 0 or text[0] != '"' or text[-1] != '"':
+        return text
 
-    positivepromptfound = False
-    negativepromptfound = False
-    extrasfound = False
-
-    if fieldtoretrieve not in mystr:
-        print(fieldtoretrieve + " not found in " + mystr)  
-        return None
+    try:
+        return json.loads(text)
+    except Exception:
+        return text
     
-    if 'steps:' in mystr:
-        extrasfound = True
+def parse_generation_parameters(x: str):
+    """parses generation parameters string, the one you see in text field under the picture in UI:
+```
+girl with an artist's beret, determined, blue eyes, desert scene, computer monitors, heavy makeup, by Alphonse Mucha and Charlie Bowater, ((eyeshadow)), (coquettish), detailed, intricate
+Negative prompt: ugly, fat, obese, chubby, (((deformed))), [blurry], bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), messy drawing
+Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model hash: 45dee52b
+```
 
-    mystr = remove_spaces_around_comma(mystr)
-    mystr = mystr.replace("  ", " ")
+    returns a dict with field values
+    """
 
-    if 'negative prompt:' in mystr and fieldtoretrieve=='':
-        test = mystr.split("\n")
-        negativepromptfound = True
-    elif 'negative prompt:' in mystr:
-        test = mystr.split("\n")
-        negativepromptfound = True
-    else:
-        test = mystr.split("\n")
+    re_param_code = r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)'
+    re_param = re.compile(re_param_code)
+    re_imagesize = re.compile(r"^(\d+)x(\d+)$")
+    re_hypernet_hash = re.compile("\(([0-9a-f]+)\)$")
+    if 'Template' in x:
+        print("check")
 
-    if 'lora' in mystr:
-        #print("Lora")
-        mystr = ensure_comma_before_lt(mystr)
-    
-    ret = None
-    #if negativepromptfound == False and positivepromptfound == False and fieldtoretrieve=='' or fieldtoretrieve == 'negative prompt':
-    #    print("neg or positive no neg or pos prompt")
-    #        return None
-        
+    res = {}
 
-    if fieldtoretrieve == '':
-        if test[0].startswith("steps:"):
-            print("No positive prompt.  It would have been parsed before steps if it had existed.")
-            return None
+    prompt = ""
+    negative_prompt = ""
+
+    done_with_prompt = False
+
+    *lines, lastline = x.strip().split("\n")
+    if len(re_param.findall(lastline)) < 3:
+        lines.append(lastline)
+        lastline = ''
+
+    for line in lines:
+        line = line.strip()
+        if line.startswith("Negative prompt:"):
+            done_with_prompt = True
+            line = line[16:].strip()
+        if done_with_prompt:
+            negative_prompt += ("" if negative_prompt == "" else "\n") + line
         else:
-            ret = [substring.strip() for substring in test[0].split(',')]
-            if '<lora' in ret:
-                for each in ret:
-                    if '<lora' == each:
-                            print("check" + str(each))
-                    elif '<lora' in each:
-                            print("seems fine " + str(each))
+            prompt += ("" if prompt == "" else "\n") + line
 
-    else:
-            for each in test:
-                if fieldtoretrieve in ['steps','sampler','cfg scale','seed','model']:
-                    each = each.replace('\n','')
-                    if fieldtoretrieve in each:
-                        #test = each.split([',','\n'])
-                        mystr = [substring.strip() for substring in each.split(',')]
-                        return extract_text_after2(mystr,fieldtoretrieve)
+    res["Prompt"] = prompt
+    res["Negative prompt"] = negative_prompt
+
+    for k, v in re_param.findall(lastline):
+        try:
+            if len(v) > 0:
+                if v[0] == '"' and v[-1] == '"':
+                    v = unquote(v)
+
+                m = re_imagesize.match(v)
+                if m is not None:
+                    res[f"{k}-1"] = m.group(1)
+                    res[f"{k}-2"] = m.group(2)
                 else:
-                    temp = each.split(':',1)
-                    if temp[0] == fieldtoretrieve:
-                        #subsplit = temp[1].split(",")
-                        ret = [substring.strip() for substring in temp[1].split(',')]
-                        break
+                    res[k] = v
+            else:
+                print(f"ignoring key {k} as value is empty")
+        except Exception as e:
+            print(f"Error parsing \"{k}: {v}\" {e}")
 
+    # Missing CLIP skip means it was set to 1 (the default)
+    if "Clip skip" not in res:
+        res["Clip skip"] = "1"
 
-    if ret != None:
-        ret = [item for item in ret if item != ""]
+    hypernet = res.get("Hypernet", None)
+    if hypernet is not None:
+        res["Prompt"] += f"""<hypernet:{hypernet}:{res.get("Hypernet strength", "1.0")}>"""
 
-    return ret
+    if "Hires resize-1" not in res:
+        res["Hires resize-1"] = 0
+        res["Hires resize-2"] = 0
+
+    if "Hires sampler" not in res:
+        res["Hires sampler"] = "Use same sampler"
+
+    if "Hires checkpoint" not in res:
+        res["Hires checkpoint"] = "Use same checkpoint"
+
+    if "Hires prompt" not in res:
+        res["Hires prompt"] = ""
+
+    if "Hires negative prompt" not in res:
+        res["Hires negative prompt"] = ""
+
+    #restore_old_hires_fix_params(res)
+
+    # Missing RNG means the default was set, which is GPU RNG
+    if "RNG" not in res:
+        res["RNG"] = "GPU"
+
+    if "Schedule type" not in res:
+        res["Schedule type"] = "Automatic"
+
+    if "Schedule max sigma" not in res:
+        res["Schedule max sigma"] = 0
+
+    if "Schedule min sigma" not in res:
+        res["Schedule min sigma"] = 0
+
+    if "Schedule rho" not in res:
+        res["Schedule rho"] = 0
+
+    if "VAE Encoder" not in res:
+        res["VAE Encoder"] = "Full"
+
+    if "VAE Decoder" not in res:
+        res["VAE Decoder"] = "Full"
+
+    #skip = set(shared.opts.infotext_skip_pasting)
+    #res = {k: v for k, v in res.items() if k not in skip}
+
+    return res
 
 def sanitise_path_name(folder_name):
     # Define a regular expression pattern to match invalid characters
@@ -465,15 +519,15 @@ def get_sanitised_download_time(filepath):
 def getloras(parameter):
 
     matches = re.findall(r'<lora:(.*?):', parameter)
-    Loras = '_'.join(set(matches))
+    loras = '_'.join(set(matches))
 
-    #Loras = '_'.join(matches)
+    #loras = '_'.join(matches)
 
-    if len(Loras) >0:
+    if len(loras) >0:
         #print("Lora !")
-        return Loras
+        return loras
     else:
-        return ""
+        return None
 
 def substring(stringtosearch,start_substring,end_substring):
 
@@ -586,7 +640,7 @@ def move_to_fixed_folder_with_group_number(path, filepath,groupid):
         shutil.move(filepath, destination)
 
 
-def main():
+def main(foldertosearch,destination_folder,path_to_style_file):
 
     global readstyles
     global showcounts
@@ -598,10 +652,11 @@ def main():
     global comparebytext
     global comparebytextpercentage
     global renamefiles
-    global sorted_folder
-    global root_directory
-    global stylefilepath
     global dump_prompt
+    global csv_filename
+    global csv_filename_neg
+    global csv_filename_pos
+    global csv_filename_prompts
 
     # Create a dictionary to store file hashes and corresponding folders
     file_hash_to_folder = {}
@@ -613,175 +668,267 @@ def main():
     neg_values = []
 
     if readstyles == True:
-        if os.path.exists(stylefilepath):
-            stylevars = read_style_to_list(stylefilepath)
+        if os.path.exists(path_to_style_file):
+            stylevars = read_style_to_list(path_to_style_file)
         else:
             readstyles = False
 
-    foldercnt = find_highest_numbered_folder(sorted_folder)
+    foldercnt = find_highest_numbered_folder(destination_folder)
 
     counter = 0
-    # Iterate through all files in the root_directory and its subdirectories
-    for root, dirs, files in os.walk(root_directory):
+    # Iterate through all files in the foldertosearch and its subdirectories
+    for root, dirs, files in os.walk(foldertosearch):
         for filename in files:
-            hasparameters = False
 
             file_path = os.path.join(root, filename)
 
             if filename.endswith(".png"):
                 counter += 1
                 print("Processing: " + str(counter))
+                parameter = None
+                badfile = False
+                hasparameters = False
+                platform = None
+                positiveprompt = None
+                negativeprompt = None
+                seed = None
+                loras = None
                 with Image.open(file_path) as img:
-                    try:
-                        parameter = img.info.get("parameters")
+                    if hasparameters == False:
+                        try:
+                            parameter = img.info.get("parameters")
+                        except Exception as e:
+                            print(f"Error {e}")
+                        if parameter is not None:
+                            print(filename + " has A1111 metadata.")
+                            platform = "A1111"
+                            hasparameters = True
+
+                            print(parameter)
+
+                            settings = parse_generation_parameters(parameter)
+                            #settings = [item.strip() for item in settings]
+
+                            positiveprompt = ""
+                            negativeprompt = ""
+                     
+                            #result = mytest(parameter)
+                            positivepromptarray = settings['Prompt'].split(', ')
+
+                            if 'Template: ' in parameter:
+                                print("template\n" + parameter)
+                                try:
+                                    templatevar = settings['Template'].split(', ')
+                                    if str(templatevar) != str(positivepromptarray):
+                                        print(f"template and prompt don't match\n{templatevar}\n{positivepromptarray}")
+                                except:
+                                    print("oops")
+
+                            negativepromptarray = settings['Negative prompt'].split(', ')
+
+                            if negativepromptarray != None:
+                                negativepromptarray = sorted(negativepromptarray)
+
+                            if readstyles == True:
+                                pos1, neg1 = checkposandnegarrays(stylevars,positivepromptarray,negativepromptarray)
+                            else:
+                                print("no Styles file")
+
+                            if pos1 != None and neg1 != None:
+                                print("Embedded Styles were used")
+                                pos1 = sorted(pos1)
+                                neg1 = sorted(neg1)
+                                pos_valuescount.extend(pos1)
+                                neg_valuescount.extend(pos1)
+
+                                positiveprompt = ','.join(pos1)
+                                negativeprompt = ','.join(neg1)
+
+                            else:
+                                print("No embedded Styles used")
+                                if positivepromptarray != None:
+                                    positivepromptarray = sorted(positivepromptarray)
+                                    pos_valuescount.extend(positivepromptarray)
+                                    positiveprompt = ','.join(positivepromptarray)
+
+                                if negativepromptarray != None:
+                                    negativepromptarray = sorted(negativepromptarray)                    
+                                    negativeprompt = ','.join(negativepromptarray)
+
+                                try:
+                                    steps = settings['Steps']
+                                except:
+                                    steps = None
+                                
+                                try:
+                                    seed = settings['Seed']
+                                except:
+                                    seed = None
+
+                                try:
+                                    model = settings['Model']
+                                except:
+                                    model = None
+
+                            if 'lora' in parameter.lower():
+                                foundlora = False
+                                loras1 = None
+                                loras2 = None
+                                loras3 = None
+                                if '<lora:' in positiveprompt.lower():
+                                    print('Loras declared in prompt')
+                                    loras1 = extract_between_angle_brackets(positiveprompt)
+                                    loras1 = '_'.join(loras1)
+                                    foundlora = True
+                                    print(f"loras1 in prompt: {loras1}")
+                                else:
+                                    print("No Lora in prompt")
+                                # AddNet Module 1: LoRA, AddNet Model 1:
+                                # <lora:epiNoiseoffset_v2:0.6>
+                                if 'lora' in parameter.lower():
+                                    loras2 = getloras(parameter)
+                                    if loras2 != None:
+                                        foundlora = True
+                                        print(f"loras2: {loras2}")
+                                if ': LoRA' in parameter:
+                                        if'AddNet Model 1' in settings:
+                                            loras3 = settings['AddNet Model 1']
+                                            if loras3 == '':
+                                                print("There should be a Lora but it's missing")
+                                            else:
+                                                foundlora = True
+                                                print(f"loras3: {loras3}")
+                                        if'AddNet Model 2' in settings:
+                                            loras3 = f"{loras3}_{settings['AddNet Model 2']}"
+                                            if loras3 == '':
+                                                print("There should be a Lora but it's missing")
+                                            else:
+                                                foundlora = True
+                                                print(f"loras3: {loras3}")
+                                
+                                if foundlora == False:
+                                    print("Investigate possibly")
+                                else:
+                                    
+                                    loras = loras1
+                                    if loras == None:
+                                        loras = loras2
+                                    if loras == None:
+                                        loras = loras3
+                                    print(f"{loras}")
+
+
+                        else:
+                            print("No parameters")
+                    if hasparameters == False:
+                        try:
+                            parameter = img.info.get("prompt")
+                        except Exception as e:
+                            print(f"Error {e}")
+
                         if parameter is not None:
                             #print(filename + " has metadata.")
+                            platform = "comfyUI"
                             hasparameters = True
                             badfile = False
-                            parameter = parameter.lower()
-                            if dump_prompt == True:
-                                csv_filename = os.path.join(root_directory,'parameters.csv')
-                                if not os.path.exists(csv_filename):
-                                    with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
-                                        csv_writer = csv.writer(csv_file)
-                                        csv_writer.writerow(['filename', 'prompt'])
-                                        csv_writer.writerows([filename,parameter])
-                                else:
-                                    with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
-                                        csv_writer = csv.writer(csv_file)
-                                        csv_writer.writerows([filename,parameter])
-
-
-                        else:
-                            #print("PNG with no metadata")
+                            #settings = parse_generation_parameters(parameter)
+                            continue
                             try:
-                                parameter = img.info.get("prompt")
-                                if parameter is not None:
-                                    #print(filename + " has metadata.")
-                                    hasparameters = True
-                                    badfile = False
-                                    print("we don't handle comfyui yet")
+                                json_data = json.loads(parameter)
+                                model = json_data.get('1', {}).get('inputs',{}).get('ckpt_name', None).replace('.safetensors','')
+                                positiveprompt = json_data.get('1', {}).get('inputs',{}).get('positive', None)
+                                negativeprompt = json_data.get('1', {}).get('inputs',{}).get('negative', None)
+                                seed = json_data.get('1', {}).get('inputs',{}).get('seed', None)
 
-                                    continue
-                                else:
-                                    #print("PNG with no metadata")
-                                    badfile = True
-                            except:
-                                badfile = True
-                    except:
-                        badfile = True
-            elif filename.endswith(".jpeg") or filename.endswith(".jpg"):
-                badfile = True
-            else:
-                print("Ignoring unsupported filetype: " + filename)
-                continue
+                                steps = json_data.get('2', {}).get('inputs',{}).get('steps', None)
+                                cfg = json_data.get('2', {}).get('inputs',{}).get('cfg', None)
+                                sampler = json_data.get('2', {}).get('inputs',{}).get('sampler_name', None)
+                            except Exception as e:
+                                print(f"Error {file_path}.  {e}.  \nPress a key to continue")
+                                input()
+                            loras = None
 
-            if hasparameters==True:
-
-               # test = prompt_parser.parse_prompt_attention(parameter)
-               # test2 = generation_parameters_copypaste.parse_generation_parameters(parameter)
-
-                positiveprompt = ""
-                negativeprompt = ""
-
-
-                loras = extract_between_angle_brackets(parameter)
-                
-                if len(loras) > 0 :
-                    for lora in loras:
-                        print("lora name: " + lora)
-                        if 'lora hashes: "' in parameter:
-                            print("contains multiple Lora Hashes")
-                            
-                            result =  substring(parameter,'lora hashes: "','"')
-                            allloras = result.split(",")
-                            for lor in allloras:
-                                lorarray = lor.split(": ")
-                                lorname = lorarray[0]
-                                lorhash = lorarray[1]
-                                print("found lora " + lorname + " with hash " + lorhash)
-
-                            #, adetailer version: 23.11.1, lora hashes: "add_detail: 7c6bad76eb54, add_detail: 7c6bad76eb54", ti hashes: "negative_hand-neg: 73b524a2da12", version: v1.7.0'
-                        elif 'lora hashes: ' in parameter:
-                            print("contains single Lora Hash")
-                            
-                            result =  substring(parameter,'lora hashes: ',',')
-                            allloras = result.split(",")
-                            for lor in allloras:
-                                lorarray = lor.split(": ")
-                                lorname = lorarray[0]
-                                lorhash = lorarray[1]
-                                print("found lora " + lorname + " with hash " + lorhash)
-                        
+                            print("we don't handle comfyui yet")
                         else:
-                            print("No Loras found")
+                            print("No prompt")
+                    if hasparameters == False:
+                        try:
+                            parameter = img.info.get("Software")
+                        except Exception as e:
+                            print(f"Error {e}")
 
-                if 'template:' in parameter:
-                    print("template\n" + parameter)
-                    positivepromptarray = properwaytogetPromptfield(parameter,"template")
-                else:
-                    positivepromptarray = properwaytogetPromptfield(parameter,"")
+                        if parameter is not None:
+                            if 'NovelAI' in parameter:
+                                print("NovelAI Picture")
+                                platform = "NovelAI"
 
-                negativepromptarray = properwaytogetPromptfield(parameter,"negative prompt")
+                                hasparameters = True
+                                badfile = False
 
-                if negativepromptarray != None:
-                    negativepromptarray = sorted(negativepromptarray)
+                                #settings = parse_generation_parameters(parameter)
 
-                if readstyles == True:
-                    pos1, neg1 = checkposandnegarrays(stylevars,positivepromptarray,negativepromptarray)
-                else:
-                    print("no Styles file")
 
-                if pos1 != None and neg1 != None:
-                    print("Embedded Styles were used")
-                    pos1 = sorted(pos1)
-                    neg1 = sorted(neg1)
-                    pos_valuescount.extend(pos1)
-                    neg_valuescount.extend(pos1)
+                                json_data = json.loads(img.info.get("Comment"))
+                                json_string = json.dumps(json_data, separators=(',', ':')).lower()
+                                #uc is undesired content i.e. negative prompt
+                                steps = json_data['steps']
+                                seed = json_data['seed']
+                                sampler = json_data['sampler']
+                                strength = json_data['strength']
+                                noise = json_data['noise']
+                                scale = json_data['scale']
+                                negativeprompt = json_data['uc']
+                                model = None
+                                loras = None
+                                #model
+                                #loras
+                                positiveprompt = img.info.get("Description").lower()
+                                #print("we don't handle comfyui yet")
+                        else:
+                            print("No parameters")
+                    if hasparameters == False:
+                        badfile = True
+                if positiveprompt == None: positiveprompt = ""
+                if negativeprompt == None: negativeprompt = ""
+                if dump_prompt == True and positiveprompt != "":
+                    if not os.path.exists(csv_filename_prompts):
+                        with open(csv_filename_prompts, 'w', newline='', encoding='utf-8') as csv_file:
+                            csv_writer = csv.writer(csv_file)
+                            csv_writer.writerow(['filename', 'positive prompt', 'negative prompt'])
+                            csv_writer.writerows([filename,positiveprompt,negativeprompt])
+                    else:
+                        with open(csv_filename_prompts, 'a', newline='', encoding='utf-8') as csv_file:
+                            csv_writer = csv.writer(csv_file)
+                            csv_writer.writerows([filename,positiveprompt,negativeprompt])
 
-                    positiveprompt = ','.join(pos1)
-                    negativeprompt = ','.join(neg1)
-
-                else:
-                    print("No embedded Styles used")
-                    if positivepromptarray != None:
-                        positivepromptarray = sorted(positivepromptarray)
-                        pos_valuescount.extend(positivepromptarray)
-                        positiveprompt = ','.join(positivepromptarray)
-
-                    if negativepromptarray != None:
-                        negativepromptarray = sorted(negativepromptarray)                    
-                        negativeprompt = ','.join(negativepromptarray)
-
-                if renamefiles == True:
-                    model = ""
-                    seed = ""
+                if renamefiles == True and hasparameters == True:
                     new_filename = ""
-                    steps = properwaytogetPromptfield(parameter,"steps")
+                    if platform is not None:
+                        new_filename = f"{new_filename}{platform}_"
+                        print ("model is " + platform)
+                    else:
+                        new_filename = f"{new_filename}noplatform_"
 
-                    model = properwaytogetPromptfield(parameter,"model")
                     if model is not None:
-                        new_filename = model + '_'
+                        new_filename = f"{new_filename}{model}_"
                         print ("model is " + model)
                     else:
-                        new_filename = "nomodel_"
+                        new_filename = f"{new_filename}nomodel_"
 
-                    seed = properwaytogetPromptfield(parameter,"seed")
                     if seed is not None:
                         print("Seed is " + str(seed))
-                        new_filename = new_filename + seed  + '_'
+                        new_filename = f"{new_filename}{seed}_"
                     else:
-                        new_filename = new_filename + "noseed_"
+                        new_filename = f"{new_filename}noseed_"
 
                     #new_filename = new_filename + '_' + get_sanitised_download_time(file_path) + '_'
                     # os.path.splitext(filename)[1]
-
-                    loras = ""
-                    loras = sanitise_path_name(getloras(parameter))                    
-                    if loras != "":
-                        new_filename = new_filename + 'Loras_' + loras + '_'
-                    #else:
-                    #    print("uses no Loras")
+                    if loras != None:
+                        loras_sanitised = sanitise_path_name(loras)                    
+                        if loras_sanitised != "":
+                            new_filename = f"{new_filename}loras_{loras_sanitised}"
+                        #else:
+                        #    print("uses no loras")
 
                     new_filename = new_filename + os.path.splitext(filename)[1]
                     new_filename = sanitise_path_name(new_filename)
@@ -825,9 +972,23 @@ def main():
                             elif comparebytext == True:
                                 new_array[new_item_path].append(positiveprompt)
 
+            elif filename.endswith(".jpeg") or filename.endswith(".jpg"):
+                badfile = True
+
+                with Image.open(file_path) as img:
+                    print(str(img.info))
+                print(f"don't do anything with {filename}")
+
+            else:
+                print(f"Ignoring unsupported filetype: {filename}")
+                continue
+
             if badfile==True:
-                    print(filename + " has no metadata.  Moving to nometa subdirectory")
-                    move_to_subfolder(file_path,"nometa")
+                    if move_nometa == True:
+                        print(filename + " has no metadata.  Moving to nometa subdirectory")
+                        move_to_subfolder(file_path,"nometa")
+                    else:
+                        print("moving files with no metadata is disabled")
 
     if showcounts == True:
         value_counts = Counter(pos_valuescount)
@@ -836,8 +997,7 @@ def main():
         # Print the values and their occurrence counts
         for value, count in sorted_values:
             print(f'{value}: {count}')
-        csv_filename = os.path.join(root_directory,'pos_parameter_counts.csv')
-        with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
+        with open(csv_filename_pos, 'w', newline='', encoding='utf-8') as csv_file:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(['description', 'count'])
             csv_writer.writerows(sorted_values)
@@ -848,8 +1008,7 @@ def main():
         # Print the values and their occurrence counts
         for value, count in sorted_values:
             print(f'{value}: {count}')
-        csv_filename = os.path.join(root_directory,'neg_parameter_counts.csv')
-        with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
+        with open(csv_filename_neg, 'w', newline='', encoding='utf-8') as csv_file:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(['description', 'count'])
             csv_writer.writerows(sorted_values)
@@ -858,7 +1017,6 @@ def main():
     #hash_list.sort(key=lambda x: x[0])
     # Create a CSV file to store the results
     if writecsv == True and comparebymd5 ==True :
-        csv_filename = os.path.join(root_directory, 'hash_results.csv')
         with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(['Content Hash', 'Count', 'Filename', 'Full Path'])
@@ -872,11 +1030,9 @@ def main():
                     csv_writer.writerow([content_hash, count, filename, full_path])
 
     if movefiles == True:
-
         if comparebytext == True:
             #result = create_word_groups(new_array,comparebytextpercentage,moveiffilesover)
             #looper = 0
-
 #            for i, group in enumerate(result, start=1):
                 #looper +=1
 #                print(f"Group {i}: {group}")
@@ -884,8 +1040,7 @@ def main():
 #                    print("group " + str(i) + " of " + str(len(result)))
 #                    if len(group) > moveiffilesover:
                     #shouldn't need to do this.  why do I ?
-#                        move_to_fixed_folder_with_group_number(sorted_folder,each,str(i))
-
+#                        move_to_fixed_folder_with_group_number(destination_folder,each,str(i))
             word_groups = create_word_groups_precentage(new_array)
             #word_groups = create_word_groups_parallel(new_array)
             print("Word Groups:")
@@ -896,9 +1051,7 @@ def main():
                         final = foldercnt + i
                     else:
                         final = i
-                    move_to_fixed_folder_with_group_number(sorted_folder,each,str(final))
-                    
-
+                    move_to_fixed_folder_with_group_number(destination_folder,each,str(final))
         elif comparebymd5 ==True:
             for hash, files in hash_to_files.items():
                         if len(files) > moveiffilesover:
@@ -918,7 +1071,8 @@ def main():
                                         except Exception as e:
                                             print("oops " + str(e))
                                         print(f"Moved: {file_path} to {new_file_path}")
-
+    else:
+        print("Not moving files")
     print("Files have been organized into folders.")
 
 root_directory = '/file/to/sort/'
@@ -937,6 +1091,7 @@ comparebytext=True
 dump_prompt = True
 comparebytextpercentage=90
 useapikey = False
+move_nometa = True
 
 if useapikey == True:
     #unused here
@@ -962,8 +1117,10 @@ if os.path.exists(localoverridesfile):
 else:
     print("local override file would be " + localoverridesfile)
 
-
-
-
 log_file = os.path.join(get_script_path(),get_script_name() + '.log')
-main()
+csv_filename = os.path.join(root_directory, 'hash_results.csv')
+csv_filename_neg = os.path.join(root_directory,'neg_parameter_counts.csv')
+csv_filename_pos = os.path.join(root_directory,'pos_parameter_counts.csv')
+csv_filename_prompts = os.path.join(root_directory,'prompts.csv')
+                                
+main(root_directory,sorted_folder,stylefilepath)
