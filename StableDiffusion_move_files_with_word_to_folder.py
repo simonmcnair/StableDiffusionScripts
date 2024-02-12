@@ -52,12 +52,22 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
     returns a dict with field values
     """
 
-    re_param_code = r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)'
+    re_param_code = r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|>$)'
     re_param = re.compile(re_param_code)
     re_imagesize = re.compile(r"^(\d+)x(\d+)$")
     re_hypernet_hash = re.compile("\(([0-9a-f]+)\)$")
-    if 'Template' in x:
-        print("check")
+
+    index_of_negative = x.find('\nNegative')
+    if index_of_negative != -1:
+        # Replace '\n' with an empty string only before '\nNegative'
+        y = x
+        x = x[:index_of_negative].replace('\n', '') + x[index_of_negative:]
+
+    index_of_negative = x.find('\nnegative')
+    if index_of_negative != -1:
+        # Replace '\n' with an empty string only before '\nNegative'
+        y = x
+        x = x[:index_of_negative].replace('\n', '') + x[index_of_negative:]
 
     res = {}
 
@@ -66,20 +76,43 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
 
     done_with_prompt = False
 
+    if 'cfg scale:' in x:
+        x = x.replace('cfg scale:','CFG scale:')
+
     *lines, lastline = x.strip().split("\n")
-    if len(re_param.findall(lastline)) < 3:
+
+    if 'steps:' not in lastline[6]:
+        if 'negative prompt:' in x or 'Negative prompt:' in x:
+            totalnumlines = 2
+        else:
+            totalnumlines = 1
+
+        while len(lines) > totalnumlines:
+            i = totalnumlines
+            while i < len(lines):
+                print(lines[i])
+                if 'seed:' in lines[i]:
+                    lastline = lines[i]
+                lines.pop(i)
+            i += 1
+
+    lastlinefindall = re_param.findall(lastline)
+    if len(lastlinefindall) < 3:
         lines.append(lastline)
         lastline = ''
 
     for line in lines:
         line = line.strip()
-        if line.startswith("Negative prompt:"):
+        if line.startswith("Negative prompt:") or line.startswith("negative prompt:"):
             done_with_prompt = True
             line = line[16:].strip()
         if done_with_prompt:
             negative_prompt += ("" if negative_prompt == "" else "\n") + line
         else:
             prompt += ("" if prompt == "" else "\n") + line
+
+    if 'model: ' in negative_prompt.lower() or 'model: ' in prompt.lower():
+        print(f"Model: should not be in a prompt.\nNegative: {negative_prompt}\nPositive: {prompt}")
 
     res["Prompt"] = prompt
     res["Negative prompt"] = negative_prompt
@@ -95,7 +128,10 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
                     res[f"{k}-1"] = m.group(1)
                     res[f"{k}-2"] = m.group(2)
                 else:
-                    res[k] = v
+                    if k != 'CFG scale':
+                        res[k.title()] = v
+                    else:
+                        res[k] = v
             else:
                 print(f"ignoring key {k} as value is empty")
         except Exception as e:
@@ -335,7 +371,7 @@ def find_folder_for_term(search_data,term):
     for entry in search_data:
         if term in entry["terms"]:
             return entry["folder"], entry["Move_to_subfolder"]
-    return None  # Return None if the term is not found in any entry
+    return None,None  # Return None if the term is not found in any entry
 
 def find_filepath_by_hash(hash_value, data):
     if hash_value in str(data):
@@ -349,7 +385,18 @@ def find_filepath_by_hash(hash_value, data):
                         print(f"found hash {hash_value} in {key}. Lora is {hashes['name']}.  trained words are {hashes['trainedWords']} ")
                         return hashes['name']
     return None
+def getloras(parameter):
 
+    matches = re.findall(r'<lora:(.*?):', parameter)
+    loras = '_'.join(set(matches))
+
+    #loras = '_'.join(matches)
+
+    if len(loras) >0:
+        #print("Lora !")
+        return loras
+    else:
+        return None
 def read_safetensor_header(file_path):
     print(f"processing {file_path}")
     with open(file_path, 'rb') as file:
@@ -482,10 +529,25 @@ def getlorahashes(foldertosearch):
     print("Hashing complete")
     return result
 
+def get_imagemeta(file_path):
+    try:
+        with Image.open(file_path) as img:
+            parameter = img.info.get("parameters")
+            if parameter is not None:
+                print(file_path + " has metadata.")
+                return parameter
+            else:
+                print("PNG with no metadata")
+                return None
+    except Exception as e:
+        print(f"error {e}")
+        return None
+
 def search_and_move_files(search_term_array,foldertoSearch):
     global lorafolder
     global embeddedfolder
     global cache
+    global move_file
 
     if os.path.exists(cache):
         with open(cache, 'r') as json_file:
@@ -501,7 +563,22 @@ def search_and_move_files(search_term_array,foldertoSearch):
         with open(cache, 'w') as json_file:
             json.dump(res1, json_file, indent=2)  # The 'indent' parameter is optional for pretty formatting
 
-    all_search_terms = [term for entry in search_term_array for term in entry["terms"]]
+    #search_term_array = [term for entry in search_term_array for term in entry["terms"]]
+    #search_term_array_lower = [term.lower() for entry in search_term_array for term in entry["terms"]]
+
+#    search_term_array_lower = [
+#    {"terms": [term.lower() for term in entry["terms"]]} 
+#    for entry in search_term_array
+#    ]
+
+#    for each in search_term_array:
+#        print(each)
+#        print("test")
+#        for term in each['terms']:
+#            term = term.lower()
+
+    for search_term in search_term_array:
+        search_term['terms'] = [term.lower() for term in search_term['terms']]
 
     print("searching " + foldertoSearch)
 
@@ -513,116 +590,76 @@ def search_and_move_files(search_term_array,foldertoSearch):
                 continue
             hasparameters = False
             found = False
-            checkfilename = False
-            for search_term in all_search_terms:
-                if search_term.lower() in file:
-                    print('search term exists in filename')
+            checkfilename = True
 
-                    keyword, foldername = find_folder_for_term(search_term_array,search_term)
+            for search_term in search_term_array:
+                #print(search_term)
 
-                    if keyword != False:
-                        movetofixedfolder = True
-                    else:
-                        movetofixedfolder = False
+                for term in search_term['terms']:
+                    if term.lower() in file.lower():
+                        print(f'search term {term.lower()} exists in filename {file.lower()}')
 
-                    if checkfilename == True:
-                        if movetofixedfolder == True:
-                            move_file_to_fixedfolder(file_path,foldername,keyword)
-                            found = True
-                            continue
+                        keyword, foldername = find_folder_for_term(search_term_array,term.lower())
+
+                        if keyword != None:
+                            movetofixedfolder = True
                         else:
-                            move_file_to_subfolder(file_path, foldername)
-                            found = True
-                            continue
+                            movetofixedfolder = False
+
+                        if checkfilename == True:
+                            if move_file == True:
+                                if movetofixedfolder == True:
+                                    move_file_to_fixedfolder(file_path,foldername,keyword)
+                                    found = True
+                                    continue
+                                else:
+                                    move_file_to_subfolder(file_path, foldername)
+                                    found = True
+                                    continue
             
             if found == False:
                 print("Terms did not exist in filename.  Checking params for " + file)
-
                 if file_path.endswith(".png"):
-                    with Image.open(file_path) as img:
-                        try:
-                            parameter = img.info.get("parameters")
-                            if parameter is not None:
-                                print(file_path + " has metadata.")
-                                hasparameters = True
-                                parameter = parameter.lower()
-
-                            else:
-                                print("PNG with no metadata")
-                                badfile = True
-                        except:
-                            badfile = True
-
+                    parameter = get_imagemeta(file_path)
+                    if parameter is not None:
+                        print(file_path + " has metadata.")
+                        hasparameters = True
+                        parameter = parameter.lower()
+                    else:
+                        print("PNG with no metadata")
+                        badfile = True
                 if hasparameters ==True:
                     #if any(terms) in parameter:
                     result = parse_generation_parameters(parameter)
                     res = None
                     aloras = ""
-                    if 'lora hashes' in result:
-                        print("lora hashes in parsed")
-                    
-                        loras = (result['lora hashes']).split(', ')
+                    if 'Lora Hashes' in result:
+                        #print("lora hashes in parsed")
+                        loras = (result['Lora Hashes']).split(', ')
                         loras = list(set(loras))
-
                         for lora in loras:
                             deets = lora.split(': ')
                             loraname = deets[0]
                             lorahash = deets[1]
                             res = find_filepath_by_hash(lorahash,res1)
                             if res != None:
-                                print(f"{res}")
-                                aloras = aloras + res + '_'
+                                #print(f"{res}")
+                                aloras = f"{aloras}{res}_{lorahash}_"
                             else:
                                 print(f"no hash found for {loraname}")
-                        
-#                    elif 'lora hashes' in parameter.lower():
-#                        print("unparsed lora hashes")
                     elif 'lora' in result['Prompt']:
                         print("it's in prompt")
+                        aloras = getloras(result['Prompt'])
                     else:
                         print("no loras")
-
                     if renamefiles == True:
-
                         platform = "A1111"
-
-                        try:
-                            seed = result['seed']
-                        except:
-                            seed = None
-
-                        try:
-                            model = result['model']
-                        except:
-                            model = None
-
-                        if platform is not None:
-                            new_filename = f"{platform}_"
-                            print ("model is " + platform)
-                        else:
-                            new_filename = f"{new_filename}noplatform_"
-
-                        if model is not None:
-                            new_filename = f"{new_filename}{model}_"
-                            print ("model is " + model)
-                        else:
-                            new_filename = f"{new_filename}nomodel_"
-
-                        if seed is not None:
-                            print("Seed is " + str(seed))
-                            new_filename = f"{new_filename}{seed}_"
-                        else:
-                            new_filename = f"{new_filename}noseed_"
-
-                        #new_filename = new_filename + '_' + get_sanitised_download_time(file_path) + '_'
-                        # os.path.splitext(filename)[1]
+                        seed = 'Seed_' + result.get('Seed', "None")
+                        model = 'model_' + result.get('Model', "None")
+                        new_filename = f"{platform}_{model}_{seed}"
 
                         if aloras != "":
-                            #loras_sanitised = sanitise_path_name(aloras)                    
-                            #if loras_sanitised != "":
-                            new_filename = f"{new_filename}loras_{aloras}"
-                            #else:
-                            #    print("uses no loras")
+                            new_filename = f"{new_filename}_loras_{aloras}"
 
                         new_filename = new_filename + os.path.splitext(file)[1]
                         new_filename = sanitise_path_name(new_filename)
@@ -631,41 +668,61 @@ def search_and_move_files(search_term_array,foldertoSearch):
                         print(new_item_path)
 
                         if file_path not in new_item_path:
+
+                            # Handle duplicate filenames
+                            base, ext = os.path.splitext(new_item_path)
+                            count = 1
+                            while os.path.exists(new_item_path):
+                                new_item_path = f"{base}_{count}{ext}"
+                                count += 1
+
+                            if os.path.abspath(file_path) == os.path.abspath(new_item_path):
+                                print("Source and destination are the same. No move needed.")
+                                return
+
                             try:
-                                shutil.move(file_path, new_item_path)
-                                file_path = new_item_path
+                                if os.path.exists(new_item_path):
+                                    print("This should never occur")
+                                else:
+                                    new_item_path = os.path.normpath(new_item_path)
+                                    shutil.move(file_path, new_item_path)
+                                    file_path = new_item_path
                             except Exception as e:
-                                print(str(e))
+                                print(f"Error moving '{file_path}' to '{new_item_path}': {str(e)}")
+
                         else:
                             print("doesn't need renaming.  Src and dest are the same: " + file_path + ' ' + new_item_path)
+                    for search_term in search_term_array:
+                        for term in search_term['terms']:
+                            if term.lower() in parameter.lower():
+                                print(f"Found '{term.lower()}' in parameters for : {file_path}")
 
-                    for search_term in all_search_terms:
-                    #if any(term in parameter for term in terms):  
-                        if search_term.lower() in parameter:      
-                            print(parameter)
-                            print(f"Found '{search_term}' in parameters for : {file_path}")
+                                if term =='gwenten':
+                                    print("check")
+                                keyword, foldername = find_folder_for_term(search_term_array,term.lower())
 
-                            keyword, foldername = find_folder_for_term(search_term_array,search_term)
+                                if keyword != None:
+                                    movetofixedfolder = True
+                                else:
+                                    movetofixedfolder = False
 
-                            if keyword != False:
-                                movetofixedfolder = True
-                            else:
-                                movetofixedfolder = False
+                                #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
+                                #if user_input == 'y':
+                                if move_file == True:
+                                    if movetofixedfolder == True and keyword != None and foldername !=None:
+                                        move_file_to_fixedfolder(file_path ,foldername,keyword)
+                                    elif movetofixedfolder == False and foldername !=None:
+                                        move_file_to_subfolder(file_path, foldername)
+                                    else:
+                                        print("Could not move file")
 
-                            #user_input = input("Do you want to move this file? (y/n): ").strip().lower()
-                            #if user_input == 'y':
-
-                            if movetofixedfolder == True:
-                                move_file_to_fixedfolder(file_path ,foldername,keyword)
-                            else:
-                                move_file_to_subfolder(file_path, foldername)
-
-                        #else:
-                        #    print(search_term + " not found in parameters for " + file_path)
+                            #else:
+                            #    print(search_term + " not found in parameters for " + file_path)
 
                 else:
-                    print("no parameters.  Skipping")
+                    print(f"no parameters.  Skipping {file_path}")
                     continue
+
 
 
 # Directory to search
@@ -675,7 +732,7 @@ lorafolder = '/folder/with/loras'
 embeddedfolder = '/folder/with/embedded'
 cache = ''
 renamefiles = False
-
+move_file = False
 #move_to_subfolder should be the directory you want it moving to.  If set to False it will put it in a subdirectory of the current folder
 search_data = [
     {"terms": ['searchforthis'],

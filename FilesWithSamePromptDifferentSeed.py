@@ -943,34 +943,36 @@ def main(foldertosearch,destination_folder,path_to_style_file):
                             print(str(e))
                     else:
                         print("doesn't need renaming.  Src and dest are the same: " + file_path + ' ' + new_item_path)
+                else:
+                    new_item_path = file_path
 
-                    if positiveprompt != "":
-                            #write_to_log(log_file, new_item_path + " . " + positiveprompt)
+                if positiveprompt != "":
+                        #write_to_log(log_file, new_item_path + " . " + positiveprompt)
 
-                            # Calculate an MD5 hash of the section content
-                            if comparebymd5 == True:
-                                section_hash = hashlib.md5(positiveprompt.encode()).hexdigest()
+                        # Calculate an MD5 hash of the section content
+                        if comparebymd5 == True:
+                            section_hash = hashlib.md5(positiveprompt.encode()).hexdigest()
 
-                                msg = new_item_path + " . " + section_hash
-                                print(msg)
-                                write_to_log(log_file, msg)
+                            msg = new_item_path + " . " + section_hash
+                            print(msg)
+                            write_to_log(log_file, msg)
 
-                                if section_hash in file_hash_to_folder:
-                                    folder_name = file_hash_to_folder[section_hash]
-                                else:
-                                    folder_name = section_hash
-                                    file_hash_to_folder[section_hash] = folder_name
+                            if section_hash in file_hash_to_folder:
+                                folder_name = file_hash_to_folder[section_hash]
+                            else:
+                                folder_name = section_hash
+                                file_hash_to_folder[section_hash] = folder_name
 
-                                #hash_list.append([section_hash, filename, new_item_path])
-                                hash_list[section_hash].append([new_filename, new_item_path])
+                            #hash_list.append([section_hash, filename, new_item_path])
+                            hash_list[section_hash].append([new_filename, new_item_path])
 
-                                if section_hash in hash_to_files:
-                                    hash_to_files[section_hash].append(new_item_path)
-                                else:
-                                    hash_to_files[section_hash] = [new_item_path]
+                            if section_hash in hash_to_files:
+                                hash_to_files[section_hash].append(new_item_path)
+                            else:
+                                hash_to_files[section_hash] = [new_item_path]
 
-                            elif comparebytext == True:
-                                new_array[new_item_path].append(positiveprompt)
+                        elif comparebytext == True:
+                            new_array[new_item_path].append(positiveprompt)
 
             elif filename.endswith(".jpeg") or filename.endswith(".jpg"):
                 badfile = True
@@ -1041,7 +1043,7 @@ def main(foldertosearch,destination_folder,path_to_style_file):
 #                    if len(group) > moveiffilesover:
                     #shouldn't need to do this.  why do I ?
 #                        move_to_fixed_folder_with_group_number(destination_folder,each,str(i))
-            word_groups = create_word_groups_precentage(new_array)
+            word_groups = create_word_groups_precentage(new_array,comparebytextpercentage,moveiffilesover)
             #word_groups = create_word_groups_parallel(new_array)
             print("Word Groups:")
             for i, group in enumerate(word_groups, start=1):
@@ -1083,15 +1085,15 @@ readstyles = True
 showcounts = True
 writecsv = True
 debug = True
-movefiles = True
-renamefiles = True
+movefiles = False
+renamefiles = False
 moveiffilesover = 1
 comparebymd5 = False
 comparebytext=True
 dump_prompt = True
-comparebytextpercentage=90
+comparebytextpercentage=80
 useapikey = False
-move_nometa = True
+move_nometa = False
 
 if useapikey == True:
     #unused here
