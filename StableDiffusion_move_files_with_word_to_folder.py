@@ -52,7 +52,7 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
     returns a dict with field values
     """
 
-    re_param_code = r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|>$)'
+    re_param_code = r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)'
     re_param = re.compile(re_param_code)
     re_imagesize = re.compile(r"^(\d+)x(\d+)$")
     re_hypernet_hash = re.compile("\(([0-9a-f]+)\)$")
@@ -129,7 +129,7 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
                     res[f"{k}-2"] = m.group(2)
                 else:
                     if k != 'CFG scale':
-                        res[k.title()] = v
+                        res[k.capitalize()] = v
                     else:
                         res[k] = v
             else:
@@ -633,9 +633,9 @@ def search_and_move_files(search_term_array,foldertoSearch):
                     result = parse_generation_parameters(parameter)
                     res = None
                     aloras = ""
-                    if 'Lora Hashes' in result:
+                    if 'Lora hashes' in result:
                         #print("lora hashes in parsed")
-                        loras = (result['Lora Hashes']).split(', ')
+                        loras = (result['Lora hashes']).split(', ')
                         loras = list(set(loras))
                         for lora in loras:
                             deets = lora.split(': ')
@@ -656,6 +656,8 @@ def search_and_move_files(search_term_array,foldertoSearch):
                         platform = "A1111"
                         seed = 'Seed_' + result.get('Seed', "None")
                         model = 'model_' + result.get('Model', "None")
+                        if model == "model_None":
+                            model = 'model_' + result.get('Model hash', "None")
                         new_filename = f"{platform}_{model}_{seed}"
 
                         if aloras != "":
@@ -697,8 +699,6 @@ def search_and_move_files(search_term_array,foldertoSearch):
                             if term.lower() in parameter.lower():
                                 print(f"Found '{term.lower()}' in parameters for : {file_path}")
 
-                                if term =='gwenten':
-                                    print("check")
                                 keyword, foldername = find_folder_for_term(search_term_array,term.lower())
 
                                 if keyword != None:
