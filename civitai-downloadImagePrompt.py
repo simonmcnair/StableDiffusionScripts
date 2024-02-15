@@ -127,12 +127,7 @@ def get_models():
         #params['page'] = page
         #print("processing page " + str(page))
         throttletime = 5
-        j=0
         while True:
-            if j != 0:
-                print(f"sleeping {throttletime}")
-                time.sleep(throttletime)
-
             try:
                 response = requests.get(req, headers=headers)
                 #response = requests.get(req, headers=headers,params=params)
@@ -171,7 +166,7 @@ def get_models():
                 #response = requests.get(req, headers=headers, params=params)
             
             elif response.status_code == 429:
-                throttletime += 5
+                #throttletime += 5
                 print(f"incremented the throttle by {throttletime} second")
             else:
                  write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
@@ -197,9 +192,9 @@ def get_models():
                 if each is not None and "meta" in each and each["meta"] is not None and "prompt" in each["meta"]:
                     #prompt = each["meta"]["prompt"]
                     each['url'] = replace_width_with_bob(each['url'])
-                    postid = each['PostId']
+                    postid = each['postId']
                     picid = each['id']
-                    filename = f"{UserToDL}_{postid}{picid}"
+                    filename = f"{UserToDL}_{postid}_{picid}"
                     if get_prompt == True:
                         dump_to_json(prompt_file_location, each["meta"])
                         write_to_log(logfile_path, f"prompt found for {each['url']}")
@@ -220,41 +215,40 @@ def get_models():
                                 
                                 if code in retry_codes:
                                     # retry after n seconds
+                                    print(f"Sleeping {n} before retry.")
                                     time.sleep(n)
                                     continue
 
                                 raise
-                        #filename = response.headers()
-                        if 'Content-Disposition' in response.headers:
-                            content_disposition = response.headers['Content-Disposition']
-                            filename_start = content_disposition.find('filename=') + len('filename=')
-                            suggested_filename = content_disposition[filename_start:].strip(' "')
-
-                            # Unquote the filename if it's URL-encoded
-                            suggested_filename = unquote(suggested_filename)
-
-                            print(content_disposition)
-                        else:
-                            if response.headers['content-type'] =='image/jpeg':
-                                download_fullpath = extract_jpeg_filename(each['url'])
-                            elif response.headers['content-type'] =='image/png':
-                                download_fullpath = extract_jpeg_filename(each['url'])
-                                download_fullpath = download_fullpath.replace('jpeg','png')
-
-                        download_fullpath = os.path.join(download_to,download_fullpath)
-                        #download_fullpath = 'c:/users/simon/desktop/1.png'
-                        file_size = int(response.headers.get("content-length", 0))
-
-                        if 'image/jpeg' not in response.headers['content-type'] and 'image/png' not in response.headers['content-type'] and 'Transfer-Encoding' not in response.headers:
-                            print(response.headers['content-type'])
-                        
+                    
                         if 'Transfer-Encoding' in response.headers:
                             print("chunked")
                             if 'PNG' in str(response.content):
                                 print('Chunked PNG file')
+                                if ext == None:
+                                    ext = '.png'             
                             elif 'JFIF' in str(response.content):
-                                print('Chunked PNG file')
-                            else:    print("oof")
+                                print('Chunked jpg file')
+                                if ext == None:
+                                    ext = '.jpg'
+                            elif 'MP4' in str(response.content):
+                                print('Chunked MP4 file')
+                                if ext == None:
+                                    ext = '.mp4'
+                            elif 'GIF89' in str(response.content):
+                                print('Chunked MP4 file')
+                                if ext == None:
+                                    ext = '.mp4'
+                            else:    
+                                print("oof")
+                                if ext == None:
+                                    print("double oomph")
+                                    continue
+                                continue
+
+                            download_fullpath = filename + ext
+                            download_fullpath = os.path.join(download_to,download_fullpath)
+
                             if response.headers['Transfer-Encoding'] == 'chunked':
                                 try:
                                     with open(download_fullpath, "wb") as file, tqdm(
@@ -277,6 +271,27 @@ def get_models():
                         else:
                             print("not chunked")
 
+                            #download_fullpath = 'c:/users/simon/desktop/1.png'
+                            file_size = int(response.headers.get("content-length", 0))
+                            ext = None
+                            if 'image/jpeg' in response.headers['content-type']:
+                                ext = '.jpg'
+                            elif 'image/png' in response.headers['content-type']:
+                                ext = '.png'
+                            elif 'video/mp4' in response.headers['content-type']:
+                                ext = '.mp4'
+                            elif 'image/gif' in response.headers['content-type']:
+                                ext = '.gif'
+                            else:
+                                print(f"don't know {response.headers['content-type']}" )
+
+                            if ext == None:
+                                print("oomph")
+                                continue
+                            else:
+                                download_fullpath = filename + ext
+                                download_fullpath = os.path.join(download_to,download_fullpath)
+
                             if onlypng == True and response.headers['content-type'] =='image/jpeg':
                                 print("not downloading a jpg as PNG is required")
                                 continue
@@ -295,15 +310,6 @@ def get_models():
                                         file2.write(response.content)
                 else:
                     write_to_log(logfile_path, f"no prompt found for {each['url']}")
-
-        # Check if there are more pages
-        #if (data['metadata'].get('totalPages')) == None:
-        #    print("no such section.  just increment the page number")
-
-        #if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
-        #    print("ran out of pages")
-        #    break
-        #el
         
         if req == None:
             print("no more pages")
