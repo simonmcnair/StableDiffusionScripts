@@ -6,6 +6,26 @@ import json
 import time
 import re
 import platform
+from http import HTTPStatus
+from requests.exceptions import HTTPError
+from urllib.parse import unquote
+from tqdm import tqdm
+
+retry_codes = [
+    HTTPStatus.TOO_MANY_REQUESTS,
+    HTTPStatus.INTERNAL_SERVER_ERROR,
+    HTTPStatus.BAD_GATEWAY,
+    HTTPStatus.SERVICE_UNAVAILABLE,
+    HTTPStatus.GATEWAY_TIMEOUT,
+]
+
+retries = 3
+
+def replace_width_with_bob(url):
+    # Use regular expression to replace /width=* with /bob/
+    modified_url = re.sub(r'/width=\d+', '/original=true', url)
+
+    return modified_url
 
 def dump_to_json(filename,data):
 
@@ -56,6 +76,15 @@ def sleep(timeout, retry=3):
 def extract_url_cursor(url):
     model_cursor_match = re.search(r'cursor=(\d+)', url)
 
+def extract_jpeg_filename(url):
+    # Split the URL to get the filename
+    _, filename = os.path.split(url)
+
+    # If the filename contains query parameters, remove them
+    filename = filename.split('?')[0]
+
+    return filename
+
 #@sleep(3)
 def get_models():
 
@@ -64,29 +93,39 @@ def get_models():
     global prompt_file_location
     # Initialize the first page
     page = 1
-    batchsize = 10
 
-    limit = 10
+    limit = 100
     sort = "Most Reactions"
     view = "feed"
     #cursor = "1"
     headers = {}
     headers['Content-Type'] = 'application/json'
+    headers['content-disposition'] = ''
     #headers["Authorization"] = f"Bearer {apikey}"
 
-    params = {
-        'limit' : limit,
+    #params = {
+    #    'limit' : limit,
     #    'cursor': 1
     #    "favourites":"true"
     #    "sort": sort,
     #    "view": view
-    }
+    #}
+
+    onlypng = True
+    #postid = 1416958
+    #https://civitai.com/api/v1/models?token={apikey}
+    #req = f'https://civitai.com/api/v1/images?postId={postid}'
+    #req = f'https://civitai.com/api/v1/images?tag={UserToDL}&limit={limit}'
+    req = f'https://civitai.com/api/v1/images?username={UserToDL}'
+    #req = f'https://civitai.com/api/v1/images?postId={postid}'
+    totalcnt = 0
+    page = 0       
     while True:
         all_data = []
 
+        page += 1
         #params['page'] = page
         #print("processing page " + str(page))
-        u = 0
         throttletime = 5
         j=0
         while True:
@@ -95,11 +134,8 @@ def get_models():
                 time.sleep(throttletime)
 
             try:
-                #https://civitai.com/api/v1/models?token={apikey}
-                req = f'https://civitai.com/api/v1/images?tag={UserToDL}'
-                #req = f'https://civitai.com/api/v1/images?username={UserToDL}&page={page}'
-                
-                response = requests.get(req, headers=headers,params=params)
+                response = requests.get(req, headers=headers)
+                #response = requests.get(req, headers=headers,params=params)
                 #test = extract_url_cursor(response)
                 #response = requests.get(req, headers=headers, params=params)
             except Exception as e:
@@ -108,13 +144,6 @@ def get_models():
             if response.status_code == 200:
                 current_data = response.json()
                 all_data.extend(current_data)
-
-                # Check if there's more data to retrieve
-                if 'cursor' in current_data:
-                    cursor = current_data['cursor']
-                #else:
-                #    break  # No more data
-
                 try:
                     data = response.json()
                     if 'items' in data:
@@ -127,6 +156,10 @@ def get_models():
                 print("error.  Site down")
                 exit()
 
+            elif response.status_code == 400:
+                print(f"bad request {response.text}")
+                break
+
             elif response.status_code == 404:
                 print("not found")
                 break
@@ -134,7 +167,8 @@ def get_models():
             elif response.status_code == 401 and apikey:
                 # Retry the request with the API key
                 headers["Authorization"] = f"Bearer {apikey}"
-                response = requests.get(req, headers=headers, params=params)
+                response = requests.get(req, headers=headers)
+                #response = requests.get(req, headers=headers, params=params)
             
             elif response.status_code == 429:
                 throttletime += 5
@@ -143,21 +177,18 @@ def get_models():
                  write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
             j += 1
 
-        u += 1
-        if u == batchsize:
-            u = 1
-        
         # Check if there are models in the response
         if 'items' in data and len(data['items']) > 0:
             # Extract 'id' field from each model and add it to the list
-            write_to_log(logfile_path, "totalcnt = " + str(data['metadata'].get('totalItems')))
-            write_to_log(logfile_path, "page = " + str(data['metadata'].get('currentPage')) + " of " + str(data['metadata'].get('totalPages')))
+            #write_to_log(logfile_path, "totalcnt = " + str(data['metadata'].get('totalItems')))
+            #write_to_log(logfile_path, "page = " + str(data['metadata'].get('currentPage')) + " of " + str(data['metadata'].get('totalPages')))
 
-            totes = (data['metadata'].get('pageSize'))
-            r = 0
-            for each in data['items']:
-                r += 1
-                print(f"processing {r}/{totes} page {data['metadata'].get('currentPage')}/{data['metadata'].get('totalPages')}")
+            req = (data['metadata'].get('nextPage'))
+            #totes = (data['metadata'].get('pageSize'))
+            for count, each in enumerate(data['items']):
+                totalcnt +=1
+                count +=1
+                print(f"{count} of page {page}.  Total processed: {totalcnt}.")
                 time.sleep(1)
                 id = each.get('id')
                 name = each.get('name')
@@ -165,27 +196,125 @@ def get_models():
 
                 if each is not None and "meta" in each and each["meta"] is not None and "prompt" in each["meta"]:
                     #prompt = each["meta"]["prompt"]
-                    dump_to_json(prompt_file_location, each["meta"])
-                    write_to_log(logfile_path, f"prompt found for {each['url']}")
+                    each['url'] = replace_width_with_bob(each['url'])
+                    postid = each['PostId']
+                    picid = each['id']
+                    filename = f"{UserToDL}_{postid}{picid}"
+                    if get_prompt == True:
+                        dump_to_json(prompt_file_location, each["meta"])
+                        write_to_log(logfile_path, f"prompt found for {each['url']}")
+
+                    if get_image == True:
+                        for n in range(retries):
+                            try:
+                                response = requests.get(each['url'], headers=headers)
+                                #response = requests.get(url, headers=headers, params=params)
+                                response.raise_for_status()
+                                #if response.headers['Content-Type'] =='text/plain':
+                                #    print("This shouldn't happen")
+                                #    continue
+                                break
+
+                            except HTTPError as exc:
+                                code = exc.response.status_code
+                                
+                                if code in retry_codes:
+                                    # retry after n seconds
+                                    time.sleep(n)
+                                    continue
+
+                                raise
+                        #filename = response.headers()
+                        if 'Content-Disposition' in response.headers:
+                            content_disposition = response.headers['Content-Disposition']
+                            filename_start = content_disposition.find('filename=') + len('filename=')
+                            suggested_filename = content_disposition[filename_start:].strip(' "')
+
+                            # Unquote the filename if it's URL-encoded
+                            suggested_filename = unquote(suggested_filename)
+
+                            print(content_disposition)
+                        else:
+                            if response.headers['content-type'] =='image/jpeg':
+                                download_fullpath = extract_jpeg_filename(each['url'])
+                            elif response.headers['content-type'] =='image/png':
+                                download_fullpath = extract_jpeg_filename(each['url'])
+                                download_fullpath = download_fullpath.replace('jpeg','png')
+
+                        download_fullpath = os.path.join(download_to,download_fullpath)
+                        #download_fullpath = 'c:/users/simon/desktop/1.png'
+                        file_size = int(response.headers.get("content-length", 0))
+
+                        if 'image/jpeg' not in response.headers['content-type'] and 'image/png' not in response.headers['content-type'] and 'Transfer-Encoding' not in response.headers:
+                            print(response.headers['content-type'])
+                        
+                        if 'Transfer-Encoding' in response.headers:
+                            print("chunked")
+                            if 'PNG' in str(response.content):
+                                print('Chunked PNG file')
+                            elif 'JFIF' in str(response.content):
+                                print('Chunked PNG file')
+                            else:    print("oof")
+                            if response.headers['Transfer-Encoding'] == 'chunked':
+                                try:
+                                    with open(download_fullpath, "wb") as file, tqdm(
+                                        desc="Downloading",
+                                        total=file_size,
+                                        unit="B",
+                                        unit_scale=True,
+                                        unit_divisor=1024,
+                                    ) as bar:
+                                        # Iterate over the content in chunks and write to the file
+
+                                        for chunk in response.iter_content(chunk_size=8192):  # You can adjust the chunk size
+                                            if chunk:
+                                                #print("chunk")
+                                                file.write(chunk)
+                                                bar.update(len(chunk))
+                                except Exception as e:
+                                    print(f"failed {e}")
+
+                        else:
+                            print("not chunked")
+
+                            if onlypng == True and response.headers['content-type'] =='image/jpeg':
+                                print("not downloading a jpg as PNG is required")
+                                continue
+
+                            if (os.path.exists(download_fullpath)) == True:
+                                filesize_is = os.path.getsize(download_fullpath)
+                                if file_size != filesize_is:
+                                    write_to_log(logfile_path, f"File {download_fullpath} is {filesize_is} and should be {file_size}.   Failed download.")
+                                    with open(download_fullpath, 'wb') as file2:
+                                        file2.write(response.content)
+                                elif (os.path.exists(download_fullpath)) == True and file_size == filesize_is:
+                                    write_to_log(logfile_path, f"File is correct size ({filesize_is}).  Next..")
+                                    continue
+                            else:
+                                    with open(download_fullpath, 'wb') as file2:
+                                        file2.write(response.content)
                 else:
-                    prompt = None
                     write_to_log(logfile_path, f"no prompt found for {each['url']}")
 
         # Check if there are more pages
-        if (data['metadata'].get('totalPages')) == None:
-            print("no such section.  just increment the page number")
+        #if (data['metadata'].get('totalPages')) == None:
+        #    print("no such section.  just increment the page number")
 
-        elif data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
-            print("ran out of pages")
+        #if data['metadata'].get('currentPage') == (data['metadata'].get('totalPages')):
+        #    print("ran out of pages")
+        #    break
+        #el
+        
+        if req == None:
+            print("no more pages")
             break
-
-        page += 1
 
 
 download_to = '/folder/to/download/to'
 UserToDL = 'username'
 prompt_file_location = '/folder/to/download/to.txt'
-
+get_prompt=True
+get_image=True
 
 apifile = os.path.join(get_script_path(), "apikey.py")
 if os.path.exists(apifile):
