@@ -32,7 +32,7 @@ def dump_to_json(filename,data):
     if not isinstance(data, dict):
         data = {"data": data}
 
-    with open(filename, 'a', encoding='utf-8') as json_file:
+    with open(filename, 'w', encoding='utf-8') as json_file:
         json.dump(data, json_file, indent=2)  # indent for pretty formatting (optional)
         json_file.write('\n')
 
@@ -86,6 +86,7 @@ def extract_jpeg_filename(url):
     return filename
 
 #@sleep(3)
+
 def get_models():
 
     global apikey
@@ -94,15 +95,16 @@ def get_models():
     # Initialize the first page
     page = 1
 
-    limit = 100
-    sort = "Most Reactions"
-    view = "feed"
-    #cursor = "1"
     headers = {}
     headers['Content-Type'] = 'application/json'
     headers['content-disposition'] = ''
     #headers["Authorization"] = f"Bearer {apikey}"
 
+    limit = 100
+    sort = "Most Reactions"
+    view = "feed"
+    #cursor = "1"
+    
     #params = {
     #    'limit' : limit,
     #    'cursor': 1
@@ -111,21 +113,18 @@ def get_models():
     #    "view": view
     #}
 
+
     onlypng = True
     #postid = 1416958
     #https://civitai.com/api/v1/models?token={apikey}
-    #req = f'https://civitai.com/api/v1/images?postId={postid}'
+    #req = f'https://civitai.com/api/v1/images?postId={postid}&limit={limit}'
     #req = f'https://civitai.com/api/v1/images?tag={UserToDL}&limit={limit}'
-    req = f'https://civitai.com/api/v1/images?username={UserToDL}'
-    #req = f'https://civitai.com/api/v1/images?postId={postid}'
+    req = f'https://civitai.com/api/v1/images?username={UserToDL}&limit={limit}'
     totalcnt = 0
     page = 0       
     while True:
         all_data = []
-
         page += 1
-        #params['page'] = page
-        #print("processing page " + str(page))
         throttletime = 5
         while True:
             try:
@@ -170,21 +169,17 @@ def get_models():
                 print(f"incremented the throttle by {throttletime} second")
             else:
                  write_to_log(logfile_path, "status code: " + str(response.status_code) + " " + response.reason)
-            j += 1
 
         # Check if there are models in the response
+        req = (data['metadata'].get('nextPage'))
+        write_to_log(logfile_path,f"req:  {req}")
         if 'items' in data and len(data['items']) > 0:
-            # Extract 'id' field from each model and add it to the list
-            #write_to_log(logfile_path, "totalcnt = " + str(data['metadata'].get('totalItems')))
-            #write_to_log(logfile_path, "page = " + str(data['metadata'].get('currentPage')) + " of " + str(data['metadata'].get('totalPages')))
-
-            req = (data['metadata'].get('nextPage'))
-            #totes = (data['metadata'].get('pageSize'))
+            numitem = len(data['items'])
             for count, each in enumerate(data['items']):
                 totalcnt +=1
                 count +=1
-                print(f"{count} of page {page}.  Total processed: {totalcnt}.")
-                time.sleep(1)
+                print(f"{count}/{numitem} of page {page}.  Total processed: {totalcnt}.")
+                #time.sleep(1)
                 id = each.get('id')
                 name = each.get('name')
                 write_to_log(logfile_path, f"processing {id}")
@@ -196,7 +191,9 @@ def get_models():
                     picid = each['id']
                     filename = f"{UserToDL}_{postid}_{picid}"
                     if get_prompt == True:
-                        dump_to_json(prompt_file_location, each["meta"])
+                        json_file = os.path.join(download_to,filename + '.txt')
+                        #dump_to_json(prompt_file_location, each["meta"])
+                        dump_to_json(json_file, each["meta"])
                         write_to_log(logfile_path, f"prompt found for {each['url']}")
 
                     if get_image == True:
@@ -218,7 +215,6 @@ def get_models():
                                     print(f"Sleeping {n} before retry.")
                                     time.sleep(n)
                                     continue
-
                                 raise
                     
                         if 'Transfer-Encoding' in response.headers:
@@ -249,25 +245,26 @@ def get_models():
                             download_fullpath = filename + ext
                             download_fullpath = os.path.join(download_to,download_fullpath)
 
-                            if response.headers['Transfer-Encoding'] == 'chunked':
-                                try:
-                                    with open(download_fullpath, "wb") as file, tqdm(
-                                        desc="Downloading",
-                                        total=file_size,
-                                        unit="B",
-                                        unit_scale=True,
-                                        unit_divisor=1024,
-                                    ) as bar:
-                                        # Iterate over the content in chunks and write to the file
-
-                                        for chunk in response.iter_content(chunk_size=8192):  # You can adjust the chunk size
-                                            if chunk:
-                                                #print("chunk")
-                                                file.write(chunk)
-                                                bar.update(len(chunk))
-                                except Exception as e:
-                                    print(f"failed {e}")
-
+                            if os.path.exists(download_fullpath):
+                                print("assume it was successful")
+                            else:
+                                if response.headers['Transfer-Encoding'] == 'chunked':
+                                    try:
+                                        with open(download_fullpath, "wb") as file, tqdm(
+                                            desc="Downloading",
+                                            total=file_size,
+                                            unit="B",
+                                            unit_scale=True,
+                                            unit_divisor=1024,
+                                        ) as bar:
+                                            # Iterate over the content in chunks and write to the file
+                                            for chunk in response.iter_content(chunk_size=8192):  # You can adjust the chunk size
+                                                if chunk:
+                                                    #print("chunk")
+                                                    file.write(chunk)
+                                                    bar.update(len(chunk))
+                                    except Exception as e:
+                                        print(f"failed {e}")
                         else:
                             print("not chunked")
 
@@ -315,7 +312,6 @@ def get_models():
             print("no more pages")
             break
 
-
 download_to = '/folder/to/download/to'
 UserToDL = 'username'
 prompt_file_location = '/folder/to/download/to.txt'
@@ -344,11 +340,8 @@ if os.path.exists(localoverridesfile):
     #apikey = apikey
     #print("API Key:", apikey)
     print("local override file is " + localoverridesfile)
-
 else:
     print("local override file would be " + localoverridesfile)
-
-
 
 logfile_path = os.path.join(download_to,'logfile.log')
 successfile_path = os.path.join(download_to,'successfile.log')

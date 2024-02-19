@@ -4,6 +4,53 @@ import os
 import json
 import requests
 import re
+import time
+from time import sleep
+
+def replace_width_with_bob(url):
+    # Use regular expression to replace /width=* with /bob/
+    modified_url = re.sub(r'/width=\d+', '/original=true', url)
+
+    return modified_url
+
+def download_with_retry(url, max_retries=3, retry_delay=5):
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+
+            # Check HTTP status code
+            if response.status_code == 200:
+                # Process the content here
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        # Process each chunk as needed
+                        print(chunk)
+
+                # Check for unexpected connection termination
+                if not response.content:
+                    print("Connection closed unexpectedly")
+
+                return True  # Download successful
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error during attempt {attempt}: {e}")
+
+        # Retry after a delay
+        if attempt < max_retries:
+            print(f"Retrying in {retry_delay} seconds...")
+            sleep(retry_delay)
+
+    print("Max retries reached. Download failed.")
+    return False  # Download unsuccessful
+
+# Example usage
+#success = download_with_retry(url)
+
+#if success:
+#    print("Download successful!")
+#else:
+#    print("Download failed after retries.")
 
 def create_prompt(json_data):
     # Your JSON object
@@ -78,59 +125,77 @@ def create_prompt(json_data):
     print(formatted_string)
     return formatted_string
 
-def walkfoldertree():
-    global search_folder
+def walkfoldertree(treetoproc):
 
     headers = {}
     headers['Content-Type'] =  'application/json'
     force_image_dl = True
+    png = True
 
-    for root, dirs, files in os.walk(search_folder):
+    for root, dirs, files in os.walk(treetoproc):
         for filename in files:
-            if '.json' in filename or '.civitai.info' in filename:
-                fullfilepath = os.path.join(root,filename)
+            if  filename.endswith('.civitai.info'):
+                fullfilepath = os.path.normpath(os.path.join(root,filename))
 
-                #if '.civitai.info' in filename or 'safetensors.json' in filename:
-                if '.civitai.info' in filename :
+                if 'l4t3xv3lm4' in filename:
+                    print("test")
+                result = re.search(r'\d+_\d+_(.*)', filename)
+                if result:
+                    originalfilenamebeforeanyperiods = result.group(1)
 
-                    result = re.search(r'\d+_\d+_(.*)', filename)
-                    if result:
-                        originalfilenamebeforeanyperiods = result.group(1)
+                with open(fullfilepath, 'r', encoding='utf-8') as file:
+                    json_data = json.load(file)
 
-                    with open(fullfilepath, 'r', encoding='utf-8') as file:
-                        json_data = json.load(file)
+                base_name, ext = os.path.splitext(originalfilenamebeforeanyperiods)
+                base_name, ext = os.path.splitext(base_name)
+                print(f"Processing {base_name}")
+                if 'id' in json_data and 'modelId' in json_data:
+                    id = json_data['id']
+                    model_id = json_data['modelId']
+                    allprompts = os.path.normpath((os.path.join(root,(f"{base_name}_prompts.txt"))))
 
-                    base_name, ext = os.path.splitext(originalfilenamebeforeanyperiods)
-                    base_name, ext = os.path.splitext(base_name)
-                    if 'id' in json_data and 'modelId' in json_data:
-                        id = json_data['id']
-                        model_id = json_data['modelId']
-
-                        if 'images' in json_data:
-                            for index,image in enumerate(json_data['images']):
-                                imagename,imageext = os.path.splitext(image['url'])
-                                if image['type'] == 'image':
-                                    if 'prompt' in image['meta']:
-                                        metadata = create_prompt(image['meta'])
-                                        if metadata != False:
-                                            print(image['url'])
-                                            png = True
-                                            if png == True:
-                                                 image['url'] = image['url'].replace('.jpeg','.png')
-                                                 image['url'] = image['url'].replace('.jpg','.png')
-                                                 image['url'] = image['url'].replace('/width=450','')
-                                            print(image['url'])
-                                                         
-                                            download_prompt_fullpath = os.path.join(root,f"{model_id}_{id}_{base_name}_{index}.txt")
-
-                                            if not os.path.exists(download_prompt_fullpath):
-                                                with open(download_prompt_fullpath, 'w', newline='\r\n', encoding='utf-8') as file2:
-                                                            file2.write(metadata)
-                                                with open(allprompts, 'a', newline='\r\n', encoding='utf-8') as file2:
+                    if 'images' in json_data:
+                        for index,image in enumerate(json_data['images']):
+                            imagename,imageext = os.path.splitext(image['url'])
+                            if 'meta' in image:
+                                #we only want images or prompts with metadata
+                                if image.get('type') == 'image':
+                                    if get_prompt == True: 
+                                        if image['meta'] != None:
+                                            if 'prompt' in image['meta']:
+                                                if png == True:
+                                                    image['url'] = image['url'].replace('.jpeg','.png')
+                                                    image['url'] = image['url'].replace('.jpg','.png')
+                                                    image['url'] = replace_width_with_bob(image['url'])
+                                                    if os.path.exists(allprompts) and os.path.getsize(allprompts) > 0:
+                                                        print("prompt already exists and isn't zero")
+                                                    else:
+                                                        metadata = create_prompt(image['meta'])
+                                                        with open(allprompts, 'w', newline='\r\n', encoding='utf-8') as file2:
                                                             file2.write(f"{metadata}\r\n")
-                                            else:
-                                                 print("Prompt file already exists")
+                                        else:print("No prompt.")
+                                    else:
+                                        print("We're not downloading prompts")
 
+                                    if get_images == True:
+
+                                        result = re.search(r'.*\/(.*..*$)', image['url'])
+                                                 
+                                        if result:
+                                            image_file_name = result.group(1)
+
+                                            image_file_name = image_file_name.replace('.jpeg','.png')
+                                            image_file_name = image_file_name.replace('.jpg','.png')
+                                            image_file_name = replace_width_with_bob(image_file_name)
+
+                                            download_image_fullpath = os.path.normpath(os.path.join(root,f"{model_id}_{id}_{base_name}_{image_file_name}"))
+                                        else:
+                                            print("could not get filename from URL.")
+                                            download_image_fullpath = os.path.normpath(os.path.join(root,f"{model_id}_{id}_{index}{imageext}"))
+
+                                        if os.path.exists(download_image_fullpath) and os.path.getsize(download_image_fullpath) >0:
+                                            print(f"image file {download_image_fullpath} already exists")  
+                                        else:
                                             response = requests.get(image['url'], headers=headers)
                                             if response.status_code == 200:
                                                 # The request was successful
@@ -141,29 +206,22 @@ def walkfoldertree():
                                                 elif response.headers['Content-Type'] == 'image/png':
                                                     print("legit PNG")
 
-                                                result = re.search(r'.*\/(.*..*$)', image['url'])
-                                                if result:
-                                                    image_file_name = result.group(1)
-                                                    download_image_fullpath = os.path.join(root,f"{model_id}_{id}_{base_name}_{image_file_name}")
-                                                else:
-                                                    print("could not get filename from URL.")
-                                                    download_image_fullpath = os.path.join(root,f"{model_id}_{id}_{index}{imageext}")
+                                                file_size = int(response.headers.get("content-length", 0))
+                                                with open(download_image_fullpath, 'wb') as file2:
+                                                            file2.write(response.content)
 
-                                                if not os.path.exists(download_image_fullpath):
-                                                    file_size = int(response.headers.get("content-length", 0))
-                                                    with open(download_image_fullpath, 'wb') as file2:
-                                                                file2.write(response.content)
-                                                else:
-                                                    print("image file already exists")                          
-                                            else:print(f"error {response.status_code}" )
-
-                                        else:print(f"erronious metadata")
-                                    else:print("No prompt.  Skipping download of picture")
-                                else:print("not an image")
+                                            else:print(f"{base_name}.  error {image['url']}.  {response.status_code}" )
+                                    else:
+                                        print("We're not downloading images")
+                                else:
+                                    print(f"this isn't an image.  It's {image.get('type')}")
+                            else:
+                                print("this has no metadata.  Ignoring")
                     else:
-                         print("invalid data")
+                        print(f"no images for {base_name}.  error {image['url']}")
 
+get_prompt = True
+get_images = True
 label_dictionary = []
-search_folder = 'X:/dif/stable-diffusion-webui-docker/data/models/Lora'
-allprompts = 'c:/users/simon/desktop/test/allprompts.txt'
-walkfoldertree()
+#allprompts = 'c:/users/simon/desktop/test/allprompts.txt'
+walkfoldertree('X:/dif/stable-diffusion-webui-docker/data/models/Lora')
