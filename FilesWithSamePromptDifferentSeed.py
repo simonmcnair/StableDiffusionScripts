@@ -13,7 +13,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 import platform
 import json
-
+import time
 #python3.11 -m venv venv
 #source ./venv/bin/activate
 #pip install nltk
@@ -639,6 +639,27 @@ def move_to_fixed_folder_with_group_number(path, filepath,groupid):
         write_to_log(log_file,f"moving {filepath} to {destination}")
         shutil.move(filepath, destination)
 
+def is_locked(filepath):
+    locked = None
+    file_object = None
+    if os.path.exists(filepath):
+        try:
+            buffer_size = 8
+            # Opening file in append mode and read the first 8 characters.
+            file_object = open(filepath, 'a', buffer_size)
+            if file_object:
+                locked = False
+        except IOError as message:
+            locked = True
+        finally:
+            if file_object:
+                file_object.close()
+    return locked
+
+def wait_for_file(filepath):
+    wait_time = 1
+    while is_locked(filepath):
+        time.sleep(wait_time)
 
 def main(foldertosearch,destination_folder,path_to_style_file):
 
@@ -679,21 +700,41 @@ def main(foldertosearch,destination_folder,path_to_style_file):
     # Iterate through all files in the foldertosearch and its subdirectories
     for root, dirs, files in os.walk(foldertosearch):
         for filename in files:
+ 
+            file_path = os.path.normpath(os.path.join(root, filename))
+            badfile = False
 
-            file_path = os.path.join(root, filename)
+            if 'nometa' in file_path:
+                continue
 
             if filename.endswith(".png"):
                 counter += 1
                 print("Processing: " + str(counter))
                 parameter = None
-                badfile = False
                 hasparameters = False
                 platform = None
                 positiveprompt = None
                 negativeprompt = None
                 seed = None
                 loras = None
-                with Image.open(file_path) as img:
+                img = None
+                try:
+                    while True:
+                        if not is_locked(file_path):
+                            img = Image.open(file_path)
+                            #img.load()
+                            img.close()
+                            break
+                        else:
+                            wait_for_file(file_path)
+
+                except Exception as e:
+                    if 'cannot identify image file' in e.args[0]:
+                        print(str(e))
+                    else:
+                        print(f"ERROR: {e}")
+
+                if img != None:
                     if hasparameters == False:
                         try:
                             parameter = img.info.get("parameters")
@@ -711,7 +752,7 @@ def main(foldertosearch,destination_folder,path_to_style_file):
 
                             positiveprompt = ""
                             negativeprompt = ""
-                     
+                        
                             #result = mytest(parameter)
                             positivepromptarray = settings['Prompt'].split(', ')
 
@@ -874,9 +915,10 @@ def main(foldertosearch,destination_folder,path_to_style_file):
                                 steps = json_data['steps']
                                 seed = json_data['seed']
                                 sampler = json_data['sampler']
-                                strength = json_data['strength']
-                                noise = json_data['noise']
-                                scale = json_data['scale']
+
+                                #strength = json_data['strength']
+                                #noise = json_data['noise']
+                                #scale = json_data['scale']
                                 negativeprompt = json_data['uc']
                                 model = None
                                 loras = None
@@ -888,98 +930,99 @@ def main(foldertosearch,destination_folder,path_to_style_file):
                             print("No parameters")
                     if hasparameters == False:
                         badfile = True
-                if positiveprompt == None: positiveprompt = ""
-                if negativeprompt == None: negativeprompt = ""
-                if dump_prompt == True and positiveprompt != "":
-                    if not os.path.exists(csv_filename_prompts):
-                        with open(csv_filename_prompts, 'w', newline='', encoding='utf-8') as csv_file:
-                            csv_writer = csv.writer(csv_file)
-                            csv_writer.writerow(['filename', 'positive prompt', 'negative prompt'])
-                            csv_writer.writerows([filename,positiveprompt,negativeprompt])
+                    if positiveprompt == None: positiveprompt = ""
+                    if negativeprompt == None: negativeprompt = ""
+                    if dump_prompt == True and positiveprompt != "":
+                        if not os.path.exists(csv_filename_prompts):
+                            with open(csv_filename_prompts, 'w', newline='', encoding='utf-8') as csv_file:
+                                csv_writer = csv.writer(csv_file)
+                                csv_writer.writerow(['filename', 'positive prompt', 'negative prompt'])
+                                csv_writer.writerows([filename,positiveprompt,negativeprompt])
+                        else:
+                            with open(csv_filename_prompts, 'a', newline='', encoding='utf-8') as csv_file:
+                                csv_writer = csv.writer(csv_file)
+                                csv_writer.writerows([filename,positiveprompt,negativeprompt])
+
+                    if renamefiles == True and hasparameters == True:
+                        new_filename = ""
+                        if platform is not None:
+                            new_filename = f"{new_filename}{platform}_"
+                            print ("model is " + platform)
+                        else:
+                            new_filename = f"{new_filename}noplatform_"
+
+                        if model is not None:
+                            new_filename = f"{new_filename}{model}_"
+                            print ("model is " + model)
+                        else:
+                            new_filename = f"{new_filename}nomodel_"
+
+                        if seed is not None:
+                            print("Seed is " + str(seed))
+                            new_filename = f"{new_filename}{seed}_"
+                        else:
+                            new_filename = f"{new_filename}noseed_"
+
+                        #new_filename = new_filename + '_' + get_sanitised_download_time(file_path) + '_'
+                        # os.path.splitext(filename)[1]
+                        if loras != None:
+                            loras_sanitised = sanitise_path_name(loras)                    
+                            if loras_sanitised != "":
+                                new_filename = f"{new_filename}loras_{loras_sanitised}"
+                            #else:
+                            #    print("uses no loras")
+
+                        new_filename = new_filename + os.path.splitext(filename)[1]
+                        new_filename = sanitise_path_name(new_filename)
+                        new_item_path = os.path.join(root, new_filename)
+
+                        print(new_item_path)
+
+                        if file_path not in new_item_path:
+                            try:
+                                shutil.move(file_path, new_item_path)
+                            except Exception as e:
+                                print(str(e))
+                        else:
+                            print("doesn't need renaming.  Src and dest are the same: " + file_path + ' ' + new_item_path)
                     else:
-                        with open(csv_filename_prompts, 'a', newline='', encoding='utf-8') as csv_file:
-                            csv_writer = csv.writer(csv_file)
-                            csv_writer.writerows([filename,positiveprompt,negativeprompt])
+                        new_item_path = file_path
+                    if positiveprompt != "":
+                            #write_to_log(log_file, new_item_path + " . " + positiveprompt)
 
-                if renamefiles == True and hasparameters == True:
-                    new_filename = ""
-                    if platform is not None:
-                        new_filename = f"{new_filename}{platform}_"
-                        print ("model is " + platform)
-                    else:
-                        new_filename = f"{new_filename}noplatform_"
+                            # Calculate an MD5 hash of the section content
+                            if comparebymd5 == True:
+                                section_hash = hashlib.md5(positiveprompt.encode()).hexdigest()
 
-                    if model is not None:
-                        new_filename = f"{new_filename}{model}_"
-                        print ("model is " + model)
-                    else:
-                        new_filename = f"{new_filename}nomodel_"
+                                msg = new_item_path + " . " + section_hash
+                                print(msg)
+                                write_to_log(log_file, msg)
 
-                    if seed is not None:
-                        print("Seed is " + str(seed))
-                        new_filename = f"{new_filename}{seed}_"
-                    else:
-                        new_filename = f"{new_filename}noseed_"
+                                if section_hash in file_hash_to_folder:
+                                    folder_name = file_hash_to_folder[section_hash]
+                                else:
+                                    folder_name = section_hash
+                                    file_hash_to_folder[section_hash] = folder_name
 
-                    #new_filename = new_filename + '_' + get_sanitised_download_time(file_path) + '_'
-                    # os.path.splitext(filename)[1]
-                    if loras != None:
-                        loras_sanitised = sanitise_path_name(loras)                    
-                        if loras_sanitised != "":
-                            new_filename = f"{new_filename}loras_{loras_sanitised}"
-                        #else:
-                        #    print("uses no loras")
+                                #hash_list.append([section_hash, filename, new_item_path])
+                                hash_list[section_hash].append([new_filename, new_item_path])
 
-                    new_filename = new_filename + os.path.splitext(filename)[1]
-                    new_filename = sanitise_path_name(new_filename)
-                    new_item_path = os.path.join(root, new_filename)
+                                if section_hash in hash_to_files:
+                                    hash_to_files[section_hash].append(new_item_path)
+                                else:
+                                    hash_to_files[section_hash] = [new_item_path]
 
-                    print(new_item_path)
-
-                    if file_path not in new_item_path:
-                        try:
-                            shutil.move(file_path, new_item_path)
-                        except Exception as e:
-                            print(str(e))
-                    else:
-                        print("doesn't need renaming.  Src and dest are the same: " + file_path + ' ' + new_item_path)
-                else:
-                    new_item_path = file_path
-
-                if positiveprompt != "":
-                        #write_to_log(log_file, new_item_path + " . " + positiveprompt)
-
-                        # Calculate an MD5 hash of the section content
-                        if comparebymd5 == True:
-                            section_hash = hashlib.md5(positiveprompt.encode()).hexdigest()
-
-                            msg = new_item_path + " . " + section_hash
-                            print(msg)
-                            write_to_log(log_file, msg)
-
-                            if section_hash in file_hash_to_folder:
-                                folder_name = file_hash_to_folder[section_hash]
-                            else:
-                                folder_name = section_hash
-                                file_hash_to_folder[section_hash] = folder_name
-
-                            #hash_list.append([section_hash, filename, new_item_path])
-                            hash_list[section_hash].append([new_filename, new_item_path])
-
-                            if section_hash in hash_to_files:
-                                hash_to_files[section_hash].append(new_item_path)
-                            else:
-                                hash_to_files[section_hash] = [new_item_path]
-
-                        elif comparebytext == True:
-                            new_array[new_item_path].append(positiveprompt)
+                            elif comparebytext == True:
+                                new_array[new_item_path].append(positiveprompt)
 
             elif filename.endswith(".jpeg") or filename.endswith(".jpg"):
                 badfile = True
-
-                with Image.open(file_path) as img:
-                    print(str(img.info))
-                print(f"don't do anything with {filename}")
+                try:
+                    with Image.open(file_path) as img:
+                        print(str(img.info))
+                    print(f"don't do anything with {filename}")
+                except Exception as e:
+                    print(str(e))
 
             else:
                 print(f"Ignoring unsupported filetype: {filename}")

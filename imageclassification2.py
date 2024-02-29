@@ -21,6 +21,13 @@ __author__='Simon McNair'
 #pip install tensorflow
 #sudo apt-get install python3-tk
 
+import pandas as pd
+import cv2
+import numpy as np
+from typing import Mapping, Tuple, Dict
+from huggingface_hub import hf_hub_download
+from onnxruntime import InferenceSession
+
 #importing libraries
 import os
 #import glob
@@ -51,6 +58,78 @@ def get_script_name():
 def get_script_path():
     return os.path.dirname(os.path.realpath(__file__))
 
+
+def ddb(imagefile):
+
+    #os.environ["CUDA_VISIBLE_DEVICES"]=""
+
+    import torch
+    # Load the model
+
+    model = torch.hub.load('RF5/danbooru-pretrained', 'resnet50')
+    model.eval()
+
+
+    from torchvision import transforms
+    input_image = Image.open(imagefile) # load an image of your choice
+    preprocess = transforms.Compose([
+        transforms.Resize(360),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.7137, 0.6628, 0.6519], std=[0.2970, 0.3017, 0.2979]),
+    ])
+    input_tensor = preprocess(input_image)
+    input_batch = input_tensor.unsqueeze(0) # create a mini-batch as expected by the model
+
+    if torch.cuda.is_available():
+        input_batch = input_batch.to('cuda')
+        model.to('cuda')
+
+    with torch.no_grad():
+        output = model(input_batch)
+
+    import json
+    import urllib, urllib.request
+
+    with urllib.request.urlopen("https://github.com/RF5/danbooru-pretrained/raw/master/config/class_names_6000.json") as url:
+        class_names = json.loads(url.read().decode())
+
+    # The output has unnormalized scores. To get probabilities, you can run a sigmoid on it.
+    probs =  torch.sigmoid(output[0]) # Tensor of shape 6000, with confidence scores over Danbooru's top 6000 tags
+    thresh=0.2
+    tmp = probs[probs > thresh]
+    inds = probs.argsort(descending=True)
+    txt = 'Predictions with probabilities above ' + str(thresh) + ':\n'
+    for i in inds[0:len(tmp)]:
+        txt += class_names[i] + ': {:.4f} \n'.format(probs[i].cpu().numpy())
+    #plt.text(input_image.size[0]*1.05, input_image.size[1]*0.85, txt)
+    return txt
+
+
+
+def unumcloud(image):
+    from transformers import AutoModel, AutoProcessor
+    import torch
+    model = AutoModel.from_pretrained("unum-cloud/uform-gen2-qwen-500m", trust_remote_code=True)
+    processor = AutoProcessor.from_pretrained("unum-cloud/uform-gen2-qwen-500m", trust_remote_code=True)
+
+    #prompt = "Question or Instruction"
+    prompt = ""
+    image = Image.open(image)
+
+    inputs = processor(text=[prompt], images=[image], return_tensors="pt")
+    with torch.inference_mode():
+        output = model.generate(
+            **inputs,
+            do_sample=False,
+            use_cache=True,
+            max_new_tokens=256,
+            eos_token_id=151645,
+            pad_token_id=processor.tokenizer.pad_token_id
+        )
+
+    prompt_len = inputs["input_ids"].shape[1]
+    decoded_text = processor.batch_decode(output[:, prompt_len:])[0]
+
 def prepend_string_to_filename(fullpath, prefix):
     # Split the full path into directory and filename
     directory, filename = os.path.split(fullpath)
@@ -63,9 +142,84 @@ def prepend_string_to_filename(fullpath, prefix):
 
     return new_fullpath
 
+def nlpconnect(fileinput):
+
+    from transformers import pipeline
+
+    image_to_text = pipeline("image-to-text", model="nlpconnect/vit-gpt2-image-captioning")
+
+    return image_to_text(fileinput)
+
+def blip2_opt_2_7b(inputfile):
+
+    # pip install accelerate bitsandbytes
+    # pip install -q -U bitsandbytes
+    # pip install -q -U git+https://github.com/huggingface/transformers.git
+    # pip install -q -U git+https://github.com/huggingface/peft.git
+    # pip install -q -U git+https://github.com/huggingface/accelerate.git
+    import torch
+    from PIL import Image
+    from transformers import Blip2Processor, Blip2ForConditionalGeneration
+    from transformers import AutoModelForCausalLM
+    from transformers import BitsAndBytesConfig
+
+
+    nf4_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.bfloat16
+    )
+
+    
+    processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
+    #model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", load_in_8bit=True, device_map="auto")
+    model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", load_in_4bit=True, device_map="auto")
+    model_nf4 = AutoModelForCausalLM.from_pretrained("Salesforce/blip2-opt-2.7b", quantization_config=nf4_config)
+
+    raw_image = Image.open(inputfile).convert('RGB')
+
+    #question = "how many dogs are in the picture?"
+    question = ""
+    inputs = processor(raw_image, question, return_tensors="pt").to("cuda", torch.float16)
+
+    out = model.generate(**inputs)
+    print(processor.decode(out[0], skip_special_tokens=True).strip())
+
+def blip_large(imagepath,model='small'):
+
+    from transformers import BlipProcessor, BlipForConditionalGeneration
+
+    if model == 'small':
+        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base").to("cuda")
+    elif model == 'large':
+        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
+        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large").to("cuda")
+
+    raw_image = Image.open(imagepath).convert('RGB')
+
+    # conditional image captioning
+    text = ""
+    inputs = processor(raw_image, text, return_tensors="pt").to("cuda")
+
+    out = model.generate(**inputs)
+    print(processor.decode(out[0], skip_special_tokens=True))
+
+    # unconditional image captioning
+    inputs = processor(raw_image, return_tensors="pt").to("cuda")
+
+    out = model.generate(**inputs)
+
+    res = processor.decode(out[0], skip_special_tokens=True)
+    return res
+
+
 
 def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
     # Check if the file exists
+    tags_list = []
+    does_image_have_tags = False
     if os.path.exists(filename):
         # Open the image
 
@@ -76,112 +230,144 @@ def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
 
         # Get the Exif data
         exifdata = image.getexif()
+        exif_data = image._getexif()
 
-        # Use a custom tag (you can modify this based on your requirements)
-        found = False
-        if tagname is not None:
-                for pil_tag, pil_tag_name in TAGS.items():
-                    if pil_tag_name == tagname:
-                        custom_tag = hex(pil_tag_name)
-                        print("using " + tagname + " for tag")
-                        found = True
-                        break
+        #print(str(exifdata))
+        #print(str(exif_data))
+
+        # Convert single tag to a list
+        if isinstance(tags, str):
+            tags = [tags]
+
+        if exifdata == None:
+            print("No exifdata")
+            found = False
+        else:
+            # Use a custom tag (you can modify this based on your requirements)
+            found = False
+            if tagname is not None:
+                    for pil_tag, pil_tag_name in TAGS.items():
+                        if pil_tag_name == tagname:
+                            #custom_tag = hex(pil_tag_name)
+                            custom_tag = pil_tag
+                            print(f"using {pil_tag} for {tagname} tag")
+                            found = True
+                            break
         if found == False or tagname == None:
             # 40094:0x9C9E:'XPKeywords'
-            print("using XPKeywords for tag")
-            custom_tag = 0x9C9E
+            print("No exifdata or tagname = None.  Using XPKeywords for tag")
+            #custom_tag = 0x9C9E
+            custom_tag = 40094
 
         # Check if the custom tag is present in the Exif data
         if custom_tag not in exifdata:
             # Custom tag doesn't exist, add it with an initial value
             exifdata[custom_tag] = ''.encode('utf-16')
+            print("image doesn't currently have any tags")
+            current_tags = []
+        else:
+            does_image_have_tags = True
+            print("image currently has tags")
 
-        # Check if the custom tag is present in the Exif data
-        if custom_tag in exifdata:
             # Decode the current tags string and remove null characters
-            tags_string_concat = exifdata[custom_tag].decode('utf-16').replace('\x00', '').replace(', ',',').replace(' ,',',')
+            current_tags = exifdata[custom_tag].decode('utf-16').replace('\x00', '').replace(', ',',').replace(' ,',',')
 
             # Split the tags into a list
-            tags_list = [tag.strip() for tag in re.split(r'[;,]', tags_string_concat)]
+            current_tags = [current_tags.strip() for current_tags in re.split(r'[;,]', current_tags)]
             #tags_list = list(set(tag.strip() for tag in re.split(r'[;,]', tags_string_concat)))
             #tags_list = tags_string_concat.split(',')
 
-            # Convert single tag to a list
-            if isinstance(tags, str):
-                tags = [tags]
-            #elif ',' in tags:
-            #    tags = tags.split(',')
+            #remove any dupes
+            current_tags = list(set(current_tags))
+            #remove any empty values
+            current_tags = {value for value in current_tags if value}
 
-            tags_list = list(set(tags_list))
+            if len(current_tags) == 0:
+                print("current_tags is there, but has no tags in")
 
-            if command == 'add':
-                # Add the tags if not present
-                for tag in tags:
-                    if tag in tags_list:
-                        print(tag + " Already present")
-                    if tag not in tags_list:
-                        print("Need to add " + tag)
-                        tags_list.append(tag)
-            elif command == 'remove':
-                # Remove the tags if present
-                for tag in tags:
-                    if tag in tags_list:
-                        print("Need to remove " + tag)
-                        tags_list.remove(tag)
-            elif command == 'show':
-                # Return the list of tags or None if empty
-                print(f"Exif tags {command}ed successfully.")
-                return tags_list if tags_list else None
-            elif command == 'update':
-                # Update an existing tag with a new value
+        if command == 'add':
+            # Add the tags if not present
+            if does_image_have_tags:
+                tags_to_add = set(tags) - set(current_tags)
+                tags_list.extend(tags_to_add)
+            else:
+                tags_list.extend(tags)
+
+        elif command == 'remove':
+            if does_image_have_tags:
+                tags_to_remove = set(tags) & set(current_tags)
+                tags_list = list(set(tags_list) - tags_to_remove)
+            else:
+                # If does_image_have_tags is False, you can decide if there's a specific removal logic
+                print("does_image_have_tags is False, skipping removal.")
+
+        elif command == 'show':
+            # Return the list of tags or None if empty
+            print(f"Exif tags {command}ed successfully.")
+            return tags_list if tags_list else None
+        elif command == 'update':
+            # Update an existing tag with a new value
                 if new_value is not None:
-                    for tag in tags:
-                        if tag in tags_list:
-                            index = tags_list.index(tag)
-                            print("updating tag " +  tag + " from " + index + " to " + new_value)
-                            tags_list[index] = new_value
-                        else:
-                            print(f"Tag '{tag}' not found for updating.")
+                    if does_image_have_tags:
+                        tags_to_add = set(tags) - set(current_tags)
+                        tags_to_remove = set(current_tags) & set(tags)
+
+                        tags_set = (set(tags_list) - tags_to_remove) | tags_to_add
+                        tags_list = list(tags_set)
+                    else:
+                        # If does_image_have_tags is False, you can decide if there's a specific update logic
+                        print("does_image_have_tags is False, skipping update.")                            
                 else:
                     print("Missing new_value for 'update' command.")
                     return
-            elif command == 'clear':
-                # Clear all tags
-                tags_list = []
-            elif command == 'count':
-                # Get the count of tags
-                print(f"Exif tags {command} completed successfully.")
+        elif command == 'clear':
+            # Clear all tags
+            tags_list = []
+        elif command == 'count':
+            # Get the count of tags
+            print(f"Exif tags {command} completed successfully.")
+            if does_image_have_tags == True:
                 return len(tags_list)
-            elif command == 'search':
-                # Check if a specific tag exists
-                print(f"Exif tags {command}ed successfully.")
-                return any(tag in tags_list for tag in tags)
             else:
-                print("Invalid command. Please use 'add', 'remove', 'show', 'update', 'clear', 'count', or 'search'.")
-                return
-
-
-            # Check if the tags have changed
-            new_tags_set = set(tags_list)
-            if set(tags) - new_tags_set:
-            #if updated_tags_string != tags_string_concat:
-                # Encode the modified tags string and update the Exif data
-                # Join the modified tags list into a string
-                updated_tags_string = ','.join(tags_list)
-
-                exifdata[custom_tag] = updated_tags_string.encode('utf-16')
-
-                # Save the image with updated Exif data
-                image.save(filename, exif=exifdata)
+                return 0
+        elif command == 'search':
+            # Check if a specific tag exists
+            if does_image_have_tags == True:
                 print(f"Exif tags {command}ed successfully.")
-                os.utime(filename, (original_atime, original_mtime))
-                print(f"atime and mtime restored.")
-
+                return any(tag in current_tags for tag in tags)
             else:
-                print("No changes in tags. File not updated.")
-
+                return ''
         else:
-            print("Custom tag not found in Exif data.")
+            print("Invalid command. Please use 'add', 'remove', 'show', 'update', 'clear', 'count', or 'search'.")
+            return
+
+        # Check if the tags have changed
+        if does_image_have_tags == True:
+            #remove dupes
+            new_tags_set = set(tags_list)
+            #remove empty/null
+            new_tags_set = {value for value in new_tags_set if value}
+
+        if does_image_have_tags == False or len(tags_list) > 0:
+            if does_image_have_tags == False:
+                print("no tags originally.  Need to add tags {tags_list}.")
+            else:
+                print(f"need to add tags {tags_list}.  Current tags are {str(list(current_tags))}")
+
+        #if updated_tags_string != tags_string_concat:
+            # Encode the modified tags string and update the Exif data
+            # Join the modified tags list into a string
+            updated_tags_string = ';'.join(tags_list)
+
+            exifdata[custom_tag] = updated_tags_string.encode('utf-16')
+
+            # Save the image with updated Exif data
+            image.save(filename, exif=exifdata)
+            print(f"Exif tags {command}ed successfully.")
+            os.utime(filename, (original_atime, original_mtime))
+            print(f"atime and mtime restored.")
+        else:
+            print(f"No changes in tags for file {filename}. File not updated.")
     else:
         print(f"File not found: {filename}")
 
@@ -196,6 +382,148 @@ def load_image_in_thread(image_path):
 
     return ImageTk.PhotoImage(image1)
 
+def image_make_square(img, target_size):
+    old_size = img.shape[:2]
+    desired_size = max(old_size)
+    desired_size = max(desired_size, target_size)
+
+    delta_w = desired_size - old_size[1]
+    delta_h = desired_size - old_size[0]
+    top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+    left, right = delta_w // 2, delta_w - (delta_w // 2)
+
+    color = [255, 255, 255]
+    return cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+
+def image_smart_resize(img, size):
+    # Assumes the image has already gone through image_make_square
+    if img.shape[0] > size:
+        img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
+    elif img.shape[0] < size:
+        img = cv2.resize(img, (size, size), interpolation=cv2.INTER_CUBIC)
+    else:  # just do nothing
+        pass
+
+    return img
+
+class CLIPInterrogator:
+    def __init__(
+            self,
+            repo='SmilingWolf/wd-v1-4-vit-tagger-v2',
+            model_path='model.onnx',
+            tags_path='selected_tags.csv',
+            mode: str = "auto"
+    ) -> None:
+        self.__repo = repo
+        self.__model_path = model_path
+        self.__tags_path = tags_path
+        self._provider_mode = mode
+
+        self.__initialized = False
+        self._model, self._tags = None, None
+
+    def _init(self) -> None:
+        if self.__initialized:
+            return
+
+        model_path = hf_hub_download(self.__repo, filename=self.__model_path)
+        tags_path = hf_hub_download(self.__repo, filename=self.__tags_path)
+        print(f"model path is {model_path}")
+
+        self._model = InferenceSession(str(model_path))
+        self._tags = pd.read_csv(tags_path)
+
+        self.__initialized = True
+
+    def _calculation(self, image: Image.Image)  -> pd.DataFrame:
+        self._init()
+
+        _, height, _, _ = self._model.get_inputs()[0].shape
+
+        # alpha to white
+        image = image.convert('RGBA')
+        new_image = Image.new('RGBA', image.size, 'WHITE')
+        new_image.paste(image, mask=image)
+        image = new_image.convert('RGB')
+        image = np.asarray(image)
+
+        # PIL RGB to OpenCV BGR
+        image = image[:, :, ::-1]
+
+        image = image_make_square(image, height)
+        image = image_smart_resize(image, height)
+        image = image.astype(np.float32)
+        image = np.expand_dims(image, 0)
+
+        # evaluate model
+        input_name = self._model.get_inputs()[0].name
+        label_name = self._model.get_outputs()[0].name
+        confidence = self._model.run([label_name], {input_name: image})[0]
+
+        full_tags = self._tags[['name', 'category']].copy()
+        full_tags['confidence'] = confidence[0]
+
+        return full_tags
+
+    def interrogate(self, image: Image) -> Tuple[Dict[str, float], Dict[str, float]]:
+        full_tags = self._calculation(image)
+
+        # first 4 items are for rating (general, sensitive, questionable, explicit)
+        ratings = dict(full_tags[full_tags['category'] == 9][['name', 'confidence']].values)
+
+        # rest are regular tags
+        tags = dict(full_tags[full_tags['category'] != 9][['name', 'confidence']].values)
+
+        return ratings, tags
+
+CLIPInterrogatorModels: Mapping[str, CLIPInterrogator] = {
+    'wd14-vit-v2': CLIPInterrogator(),
+    'wd14-convnext': CLIPInterrogator(repo='SmilingWolf/wd-v1-4-convnext-tagger'),
+    'ViT-L-14/openai': CLIPInterrogator(),
+    'ViT-H-14/laion2b_s32b_b79': CLIPInterrogator(),
+    'ViT-L-14/openai': CLIPInterrogator(),
+    'wd-v1-4-moat-tagger-v2': CLIPInterrogator(repo='SmilingWolf/wd-v1-4-moat-tagger-v2'),
+    'wd-v1-4-swinv2-tagger-v2': CLIPInterrogator(repo='SmilingWolf/wd-v1-4-swinv2-tagger-v2'),
+    'wd-v1-4-convnext-tagger-v2': CLIPInterrogator(repo='SmilingWolf/wd-v1-4-convnext-tagger-v2'),
+    'wd-v1-4-convnextv2-tagger-v2': CLIPInterrogator(repo='SmilingWolf/wd-v1-4-convnextv2-tagger-v2'),
+    'wd-v1-4-vit-tagger-v2': CLIPInterrogator(repo='SmilingWolf/wd-v1-4-vit-tagger-v2')
+}
+
+def image_to_wd14_tags(filename,modeltouse='wd14-vit-v2') \
+        -> Tuple[Mapping[str, float], str, Mapping[str, float]]:
+    
+    try:
+        image = Image.open(filename)
+        print("image: " + filename + " successfully opened.  Continue processing ")
+    except Exception as e:
+        print("Processfile Exception1: " + " failed to open image : " + filename + ". FAILED Error: " + str(e) + ".  Skipping")
+        return None
+
+    try:
+        print(modeltouse)
+        model = CLIPInterrogatorModels[modeltouse]
+        ratings, tags = model.interrogate(image)
+
+        filtered_tags = {
+            tag: score for tag, score in tags.items()
+            #if score >= .35
+            if score >= .80
+        }
+
+        text_items = []
+        tags_pairs = filtered_tags.items()
+        tags_pairs = sorted(tags_pairs, key=lambda x: (-x[1], x[0]))
+        for tag, score in tags_pairs:
+            tag_outformat = tag
+            tag_outformat = tag_outformat.replace('_', ' ')
+            tag_outformat = re.sub(RE_SPECIAL, r'\\\1', tag_outformat)
+            text_items.append(tag_outformat)
+        #output_text = ', '.join(text_items)
+        #return ratings, output_text, filtered_tags
+        return ratings, text_items, filtered_tags
+    except Exception as e:
+        print(f"Exception getting tags from image {filename}.  Error: {e}" )
+        return None
 
 ################################################################################################
 #GUI
@@ -416,33 +744,64 @@ else:
                 try:
                     fullpath = os.path.join(root,filename)
                     
-                    for each,desc in modelarray.items():
+                    # for each,desc in modelarray.items():
 
-                        print("using: " + each)
+                    #     print("using: " + each)
 
-                        processor = BlipProcessor.from_pretrained(desc)
-                        model = BlipForConditionalGeneration.from_pretrained(desc)
+                    #     processor = BlipProcessor.from_pretrained(desc)
+                    #     model = BlipForConditionalGeneration.from_pretrained(desc)
 
-                        image = Image.open(fullpath).convert('RGB')
+                    #     image = Image.open(fullpath).convert('RGB')
 
-                        inputs = processor(image, return_tensors="pt")
+                    #     inputs = processor(image, return_tensors="pt")
 
-                        out = model.generate(**inputs)
-                        print(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
+                    #     out = model.generate(**inputs)
+                    #     print(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
                     
-                        print("press a key to continue")
-                        input()
-                    break
+                    #     print("press a key to continue")
+                    #     input()
+                    # break
 
-                    result2 = result[1]
-
+                    #result = ddb(fullpath)
                     
-                    print("hi")
-                    print(fullpath)
-                    print(str(result))
-                    if result2 is not None:
-                        tagname = 'EXIF:XPKeywords'
-                        #modify_exif_tags(fullpath, result2, 'add',tagname)
+                    #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
+                    #print(f"{fullpath} . {str(result)} . wd14-vit-v2") 
+                    #result = image_to_wd14_tags(fullpath,'wd14-convnext')
+                    #print(f"{fullpath} . {str(result)} . wd14-convnext")#377MB model.onnx
+                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-moat-tagger-v2')
+                    #print(f"{fullpath} . {str(result)} . wd-v1-4-moat-tagger-v2")#377MB model.onnx
+                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-swinv2-tagger-v2')
+                    #print(f"{fullpath} . {str(result)} . wd-v1-4-swinv2-tagger-v2")#377MB model.onnx
+                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-convnext-tagger-v2')
+                    #print(f"{fullpath} . {str(result)} . wd-v1-4-convnext-tagger-v2")#377MB model.onnx
+                    result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
+                    print(f"{fullpath} . {str(result)} . wd-v1-4-convnextv2-tagger-v2")#377MB model.onnx
+                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-vit-tagger-v2')
+                    #print(f"{fullpath} . {str(result)} . wd-v1-4-vit-tagger-v2")#377MB model.onnx
+
+                    #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
+                    #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
+                    #result = image_to_wd14_tags(fullpath,'ViT-H-14/laion2b_s32b_b79')
+                    #print(f"{fullpath} . {str(result)} . ViT-H-14/laion2b_s32b_b79")
+                    #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
+                    #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
+
+                    #test = blip2_opt_2_7b(fullpath)
+                    #test = blip_large(fullpath)
+                    #test = unumcloud(fullpath)
+                    #test = nlpconnect(fullpath)
+                    #print(f"{fullpath} . {str(test)}")
+                    #exit()
+
+                    if result is not None:
+                        result2 = result[1]
+
+                        print(str(result2))
+                        tagname = 'XPKeywords'
+                        #tagname = 'EXIF:XPKeywords'
+                        modify_exif_tags(fullpath, result2, 'add',None,tagname)
+                    else:
+                        print(f"nothing detected for {fullpath}.  Odd")
                 except Exception as e:
                     print(f"oops.  {e}")
 
