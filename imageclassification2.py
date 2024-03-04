@@ -31,8 +31,15 @@ from onnxruntime import InferenceSession
 #importing libraries
 import os
 #import glob
+
 from PIL.ExifTags import TAGS
 from PIL import Image, ImageTk
+#bewlow for pngs
+from PIL import PngImagePlugin, Image
+#pip install piexif
+#import piexif
+#import piexif.helper
+
 from clip_interrogator import Config, Interrogator, list_clip_models
 import platform
 from transformers import BlipProcessor, BlipForConditionalGeneration
@@ -58,6 +65,23 @@ def get_script_name():
 def get_script_path():
     return os.path.dirname(os.path.realpath(__file__))
 
+
+def is_person(word):
+    import spacy
+
+    # Load the spaCy model for English
+    nlp = spacy.load("en_core_web_sm")
+
+    # Process the text with spaCy
+    doc = nlp(word)
+
+    # Check if any entity in the text is a person
+    is_person = any(entity.label_ == 'PERSON' for entity in doc.ents)
+
+    if is_person:
+       return True
+    else:
+       return False
 
 def ddb(imagefile):
 
@@ -215,6 +239,42 @@ def blip_large(imagepath,model='small'):
     return res
 
 
+def write_pnginfo(filename,tags):
+    if os.path.exists(filename):
+        writefile = False
+        image = Image.open(filename)
+        metadata = PngImagePlugin.PngInfo()
+        inferencefound = False
+        for key, value in image.info.items():
+            if isinstance(key, str) and isinstance(value, str):
+                if key == 'exif':
+                    print("exif data breaks the file.  Skip {filename}")
+                    continue
+                elif key == 'parameters':
+                    print(f"Stable Diffusion file. {filename}: {value}")
+                    metadata.add_text(key, value)
+                    sd = True
+                elif key =='Inference':
+                    print(f"inference text already exists. {filename}: {value}")
+                    inferencefound = True
+                    metadata.add_text(key,value)
+                else:
+                    print(f"Other: {key}.  {value}")
+                    metadata.add_text(key, value)
+        if inferencefound == False:
+            metadata.add_text('Inference',(';'.join(tags)))
+            writefile = True
+
+        if writefile == True:
+            original_mtime = os.path.getmtime(filename)
+            original_atime = os.path.getatime(filename)
+            try:
+                image.save(filename,format="PNG",pnginfo=metadata)
+            except Exception as e:
+                print(f"error {e}")
+            os.utime(filename, (original_atime, original_mtime))
+            print(f"atime and mtime restored.")
+        
 
 def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
     # Check if the file exists
@@ -230,10 +290,26 @@ def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
 
         # Get the Exif data
         exifdata = image.getexif()
-        exif_data = image._getexif()
 
-        #print(str(exifdata))
-        #print(str(exif_data))
+    #    exif_dict = piexif.load(filename)
+
+        # Print the Exif data
+    #    for ifd, data in exif_dict.items():
+    #        print(f"IFD {ifd}:")
+    #        for tag, value in data.items():
+    #            tag_name = piexif.TAGS[ifd][tag]["name"]
+               # if tag_name == 'XPKeywords':
+
+               #     keywordsraw = exif_dict["0th"][piexif.ImageIFD.XPKeywords]
+                    #keywordsraw = str(bytes(keywordsraw), "utf-16le") 
+               #     test =  str(bytes(value), "utf-16le") 
+               #     print(test)                 
+                  #  tags = ""
+                  #  for num in exif_dict["0th"][piexif.ImageIFD.XPKeywords]:
+                  #      tags += chr(num)
+
+                  #  value = xp_keywords_string
+     #           print(f"  {tag_name}: {value}")
 
         # Convert single tag to a list
         if isinstance(tags, str):
@@ -262,7 +338,9 @@ def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
         # Check if the custom tag is present in the Exif data
         if custom_tag not in exifdata:
             # Custom tag doesn't exist, add it with an initial value
-            exifdata[custom_tag] = ''.encode('utf-16')
+            
+            exifdata[custom_tag] = ''.encode('utf-16le')
+            #exifdata[custom_tag] = ''.encode('utf-16')
             print("image doesn't currently have any tags")
             current_tags = []
         else:
@@ -270,7 +348,8 @@ def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
             print("image currently has tags")
 
             # Decode the current tags string and remove null characters
-            current_tags = exifdata[custom_tag].decode('utf-16').replace('\x00', '').replace(', ',',').replace(' ,',',')
+            current_tags = exifdata[custom_tag].decode('utf-16le').replace('\x00', '').replace(', ',',').replace(' ,',',')
+            #current_tags = exifdata[custom_tag].decode('utf-16').replace('\x00', '').replace(', ',',').replace(' ,',',')
 
             # Split the tags into a list
             current_tags = [current_tags.strip() for current_tags in re.split(r'[;,]', current_tags)]
@@ -350,20 +429,21 @@ def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
 
         if does_image_have_tags == False or len(tags_list) > 0:
             if does_image_have_tags == False:
-                print("no tags originally.  Need to add tags {tags_list}.")
+                print(f"no tags originally.  Need to add tags {str(list(tags_list))}.")
             else:
-                print(f"need to add tags {tags_list}.  Current tags are {str(list(current_tags))}")
+                print(f"need to add tags {str(list(tags_list))}.  Current tags are {str(list(current_tags))}")
 
         #if updated_tags_string != tags_string_concat:
             # Encode the modified tags string and update the Exif data
             # Join the modified tags list into a string
             updated_tags_string = ';'.join(tags_list)
 
-            exifdata[custom_tag] = updated_tags_string.encode('utf-16')
+            #exifdata[custom_tag] = updated_tags_string.encode('utf-16')
+            exifdata[custom_tag] = updated_tags_string.encode('utf-16le')
 
             # Save the image with updated Exif data
             image.save(filename, exif=exifdata)
-            print(f"Exif tags {command}ed successfully.")
+            print(f"Exif tags {command}ed successfully to {filename}.")
             os.utime(filename, (original_atime, original_mtime))
             print(f"atime and mtime restored.")
         else:
@@ -740,7 +820,7 @@ else:
 
     for root, dirs, files in os.walk(defaultdir):
         for filename in files:
-            if filename.lower().endswith(('.jpg', '.jpeg')):
+            if filename.lower().endswith(('.jpg', '.jpeg','.png')):
                 try:
                     fullpath = os.path.join(root,filename)
                     
@@ -796,14 +876,17 @@ else:
                     if result is not None:
                         result2 = result[1]
 
-                        print(str(result2))
-                        tagname = 'XPKeywords'
-                        #tagname = 'EXIF:XPKeywords'
-                        modify_exif_tags(fullpath, result2, 'add',None,tagname)
+                        if len(result2) > 0:
+                            print(str(result2))
+                            tagname = 'XPKeywords'
+                            #tagname = 'EXIF:XPKeywords'
+                            if filename.lower().endswith(('.png')):
+                                write_pnginfo(fullpath, result2)
+                            elif filename.lower().endswith(('.jpg')):
+                                modify_exif_tags(fullpath, result2, 'add',None,tagname)
+                        else:
+                            print("stuff detected but not relevant/length 0")
                     else:
                         print(f"nothing detected for {fullpath}.  Odd")
                 except Exception as e:
                     print(f"oops.  {e}")
-
-
-
