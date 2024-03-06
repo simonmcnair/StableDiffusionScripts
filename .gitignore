@@ -163,3 +163,5 @@ localoverridesfile*.py
 .safetensors
 cache/*
 output.json
+stanford-ner/*
+stanford-ner-old/*

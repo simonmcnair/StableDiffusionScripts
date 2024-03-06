@@ -28,13 +28,15 @@ from typing import Mapping, Tuple, Dict
 from huggingface_hub import hf_hub_download
 from onnxruntime import InferenceSession
 
+from exiftool import ExifToolHelper
+
 #importing libraries
 import os
 #import glob
 
 from PIL.ExifTags import TAGS
 from PIL import Image, ImageTk
-#bewlow for pngs
+#below for pngs
 from PIL import PngImagePlugin, Image
 #pip install piexif
 #import piexif
@@ -48,8 +50,26 @@ import re
 #import threading
 from pathlib import Path
 
-
 import tkinter as tk
+import nltk
+from nltk.tag.stanford import StanfordNERTagger 
+nltk.download('punkt')
+#sudo apt-get install default-jre-headless
+#wget https://nlp.stanford.edu/software/stanford-ner-4.2.0.zip
+#unzip stanford-ner-4.2.0.zip
+#mkdir stanford-ner
+#cp stanford-ner-4.2.0/stanford-ner.jar stanford-ner/stanford-ner.jar
+#cp stanford-ner-4.2.0/classifiers/english.all.3class.distsim.crf.ser.gz stanford-ner/english.all.3class.distsim.crf.ser.gz
+#cp stanford-ner-4.2.0/classifiers/english.all.3class.distsim.prop stanford-ner/english.all.3class.distsim.prop
+#rm -rf stanford-ner-4.2.0 stanford-ner-4.2.0.zip
+
+##wget http://nlp.stanford.edu/software/stanford-ner-2014-08-27.zip
+##unzip stanford-ner-2014-08-27.zip
+##mkdir stanford-ner
+##cp stanford-ner-2014-08-27/stanford-ner.jar stanford-ner/stanford-ner.jar
+##cp stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz stanford-ner/english.all.3class.distsim.crf.ser.gz
+##cp stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.prop stanford-ner/english.all.3class.distsim.prop
+##rm -rf stanford-ner-2014-08-27 stanford-ner-2014-08-27.zip
 
 def get_operating_system():
     system = platform.system()
@@ -66,22 +86,20 @@ def get_script_path():
     return os.path.dirname(os.path.realpath(__file__))
 
 
-def is_person(word):
-    import spacy
+def is_person(snippet):
 
-    # Load the spaCy model for English
-    nlp = spacy.load("en_core_web_sm")
+    for sent in nltk.sent_tokenize(snippet):
+        tokens = nltk.tokenize.word_tokenize(sent)
+        tags = st.tag(tokens)
+        for tag in tags:
+            if tag[1]=='PERSON': 
+                print(f"{tag[0]} is a persons name !!!!!!")
+                return True
+            #elif tag[1]=='ORGANIZATION':
+            #    print(f"{tag} is probably a persons name !!!!!!{tag[1]}")
+            #    return True  
+    return
 
-    # Process the text with spaCy
-    doc = nlp(word)
-
-    # Check if any entity in the text is a person
-    is_person = any(entity.label_ == 'PERSON' for entity in doc.ents)
-
-    if is_person:
-       return True
-    else:
-       return False
 
 def ddb(imagefile):
 
@@ -210,6 +228,176 @@ def blip2_opt_2_7b(inputfile):
     out = model.generate(**inputs)
     print(processor.decode(out[0], skip_special_tokens=True).strip())
 
+def get_description_keywords_tag(filetoproc, istagged=False):
+    res = {}
+    taglist =[]
+    taglist.append("IPTC:Keywords")#list
+    taglist.append("XMP:TagsList")
+    taglist.append("XMP:Hierarchicalsubject")
+    #taglist.append("XMP:Categories")
+    taglist.append("XMP:CatalogSets")
+    taglist.append("XMP:LastKeywordXMP")
+    taglist.append("EXIF:XPKeywords") #string
+    taglist.append("XMP:subject")
+    keywordlist = []
+    import re
+    tagged = False
+    if istagged:
+        taglist.append('XMP:tagged')
+    try:
+        with ExifToolHelper() as et:
+                for d in et.get_tags(files=filetoproc, tags=taglist):
+                    for k, v in d.items():
+                        #print(f"Dict: {k} = {v}")
+                        if k != 'SourceFile' and k != 'XMP:Tagged':
+                                #print(k)
+                                if isinstance(v, list):
+                                    for line in v:
+                                            keywordlist.append(str(line).strip())
+                                    res[k] = keywordlist
+                                else:
+                                    if ',' in v or ';' in v:
+                                        # If either a comma or semicolon is present in the value
+                                        tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                        res[k] = ';'.join(tags)  # Join the list elements using semicolon as the separator and assign to the key k in the dictionary res
+                                    else:
+                                        res[k] = v
+                                #print("test")
+                        elif k == 'XMP:Tagged':
+                            #print("test")
+                            if v: tagged = True
+
+                for key, value in res.items():
+                    if isinstance(value, list):
+                        res[key] = list(set(value))
+        if istagged:
+            return res,tagged
+        else:
+            return res
+    except Exception as e:
+        print(f"Error {e}")
+        return False
+    
+def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False):
+    #from difflib import ndiff
+    res = {}
+    taglist =[]
+    taglist.append("IPTC:Keywords")#list
+    taglist.append("XMP:TagsList")
+    taglist.append("XMP:Hierarchicalsubject")
+    #taglist.append("XMP:Categories")
+    #taglist.append("XMP:CatalogSets")
+    taglist.append("XMP:LastKeywordXMP")
+    taglist.append("EXIF:XPKeywords") #string
+    taglist.append("XMP:subject")
+
+    tagged = False
+    if not markasprocessed:
+        taglist.append('XMP:tagged')
+
+    if valuetoinsert != None:
+        if isinstance(valuetoinsert, list):
+            keywordlist = valuetoinsert
+        else:
+            if ',' in valuetoinsert:
+                keywordlist = valuetoinsert.split(',')
+            elif ';' in valuetoinsert:
+                keywordlist = valuetoinsert.split(';')
+    elif valuetoinsert == 'del':
+        keywordlist = None
+
+    process = {}
+    try:
+        with ExifToolHelper() as et:
+            if keywordlist != None:
+                for d in et.get_tags(files=filetoproc, tags=taglist):
+                    if '18983' in str(d):
+                        print("debbug")
+                    for k, v in d.items():
+                        #print(f"Dict: {k} = {v}")
+                        copyofkeywordlist = []
+                        if k != 'SourceFile' and k != 'XMP:Tagged':
+                            #if k == 'IPTC:Keywords' or k == 'XMP:LastKeywordXMP':
+                                if isinstance(v, list):
+                                    for line in v:
+                                        if ',' in str(line) or ';' in str(line):
+                                            tags = [tag.strip() for tag in re.split('[,;]', str(line))]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                            for one in tags:
+                                                valtoinsert = one.strip()
+                                                if len(valtoinsert)>3:
+                                                    if valtoinsert not in v:
+                                                        copyofkeywordlist.append(valtoinsert)
+                                                        print(f"{valtoinsert} needs adding")
+                                                else:
+                                                    print(f"remove {valtoinsert} as it's too short ")
+                                        elif line not in v:
+                                            valtoinsert = str(line).strip()
+                                            if len(valtoinsert)>3:
+                                                copyofkeywordlist.append(valtoinsert)
+                                        elif line in v:
+                                            pass
+                                            #print(f"{line} already in {v}")
+                                        else:
+                                            print("shouldn't get here")
+                                    if len(copyofkeywordlist) >0:
+                                        setb = set(copyofkeywordlist)
+                                        copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > 3 and str(item).strip() not in setb]
+                                        print("Tags ({copyofkeywordlist}) need adding to {k}")
+                                        res[k] = copyofkeywordlist
+                                else:
+                                    if ',' in v or ';' in v:
+                                        tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                        for val in valuetoinsert:
+                                            #if ',' in val or ';' in val:
+                                            #res = [tag.strip() for tag in re.split('[,;]', val)]
+                                            #for ea in val:
+                                                if val not in v and len(val) >3:
+                                                    copyofkeywordlist.append(val)
+                                          #      else:
+                                          #          print(f"{val} already in metadata or less than 4 characters in length")
+                                            #else:
+                                            #    copyofkeywordlist.append(val.strip())
+                                        if len(copyofkeywordlist) >0:
+                                            res[k] = ';'.join(copyofkeywordlist)
+                                    else:
+                                        if len(valuetoinsert)>3:
+                                            res[k] = valuetoinsert
+                        elif k == 'XMP:Tagged':
+                            #print("test")
+                            if v: tagged = True
+
+                        process[k] = len(copyofkeywordlist)
+                        
+                    #diff = list(ndiff(d, res))
+                    #print("".join(diff))
+                if any(value != 0 for value in process.values()):
+                #if any(value != 0 for value in process):
+                    if markasprocessed:
+                        res['XMP:tagged'] = "true"
+                    et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
+                    print(f"{et.last_stdout}")
+                    return True
+                else:
+                    print(f"No modifications required to {filetoproc}")
+
+                if markasprocessed and not tagged:
+                    print(f"Marked {filetoproc} as tagged")
+                    res['XMP:tagged'] = True
+                    et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
+                    print(f"{et.last_stdout}")
+                    return True
+                
+            else:
+                deletestring = ""
+                for each in taglist:
+                    deletestring = deletestring + f"-{each}= "
+                et.execute(deletestring, filetoproc)
+
+        return True
+    except Exception as e:
+        print(f"Error {e}")
+        return False
+
 def blip_large(imagepath,model='small'):
 
     from transformers import BlipProcessor, BlipForConditionalGeneration
@@ -276,7 +464,7 @@ def write_pnginfo(filename,tags):
             print(f"atime and mtime restored.")
         
 
-def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
+def modify_exif_comment(filename, tags, command, new_value=None, tagname= None):
     # Check if the file exists
     tags_list = []
     does_image_have_tags = False
@@ -291,25 +479,160 @@ def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
         # Get the Exif data
         exifdata = image.getexif()
 
-    #    exif_dict = piexif.load(filename)
+        # Convert single tag to a list
+        if isinstance(tags, str):
+            tags = [tags]
 
-        # Print the Exif data
-    #    for ifd, data in exif_dict.items():
-    #        print(f"IFD {ifd}:")
-    #        for tag, value in data.items():
-    #            tag_name = piexif.TAGS[ifd][tag]["name"]
-               # if tag_name == 'XPKeywords':
+        if exifdata == None:
+            print("No exifdata")
+            found = False
+        else:
+            # Use a custom tag (you can modify this based on your requirements)
+            found = False
+            if tagname is not None:
+                    for pil_tag, pil_tag_name in TAGS.items():
+                        if pil_tag_name == tagname:
+                            #custom_tag = hex(pil_tag_name)
+                            custom_tag = pil_tag
+                            print(f"using {pil_tag} for {tagname} tag")
+                            found = True
+                            break
+        if found == False or tagname == None:
+            # 40094:0x9C9E:'XPKeywords'
+            print("No exifdata or tagname = None.  Using XPKeywords for tag")
+            #custom_tag = 0x9C9E
+            custom_tag = 40094
 
-               #     keywordsraw = exif_dict["0th"][piexif.ImageIFD.XPKeywords]
-                    #keywordsraw = str(bytes(keywordsraw), "utf-16le") 
-               #     test =  str(bytes(value), "utf-16le") 
-               #     print(test)                 
-                  #  tags = ""
-                  #  for num in exif_dict["0th"][piexif.ImageIFD.XPKeywords]:
-                  #      tags += chr(num)
+        # Check if the custom tag is present in the Exif data
+        if custom_tag not in exifdata:
+            # Custom tag doesn't exist, add it with an initial value
+            
+            exifdata[custom_tag] = ''.encode('utf-16le')
+            #exifdata[custom_tag] = ''.encode('utf-16')
+            print("image doesn't currently have any tags")
+            current_tags = []
+        else:
+            does_image_have_tags = True
+            print("image currently has tags")
 
-                  #  value = xp_keywords_string
-     #           print(f"  {tag_name}: {value}")
+            # Decode the current tags string and remove null characters
+            current_tags = exifdata[custom_tag].decode('utf-16le').replace('\x00', '').replace(', ',',').replace(' ,',',')
+            #current_tags = exifdata[custom_tag].decode('utf-16').replace('\x00', '').replace(', ',',').replace(' ,',',')
+
+            # Split the tags into a list
+            current_tags = [current_tags.strip() for current_tags in re.split(r'[;,]', current_tags)]
+            #tags_list = list(set(tag.strip() for tag in re.split(r'[;,]', tags_string_concat)))
+            #tags_list = tags_string_concat.split(',')
+
+            #remove any dupes
+            current_tags = list(set(current_tags))
+            #remove any empty values
+            current_tags = {value for value in current_tags if value}
+
+            if len(current_tags) == 0:
+                print("current_tags is there, but has no tags in")
+
+        if command == 'add':
+            # Add the tags if not present
+            if does_image_have_tags:
+                tags_to_add = set(tags) - set(current_tags)
+                tags_list.extend(tags_to_add)
+            else:
+                tags_list.extend(tags)
+
+        elif command == 'remove':
+            if does_image_have_tags:
+                tags_to_remove = set(tags) & set(current_tags)
+                tags_list = list(set(tags_list) - tags_to_remove)
+            else:
+                # If does_image_have_tags is False, you can decide if there's a specific removal logic
+                print("does_image_have_tags is False, skipping removal.")
+
+        elif command == 'show':
+            # Return the list of tags or None if empty
+            print(f"Exif tags {command}ed successfully.")
+            return tags_list if tags_list else None
+        elif command == 'update':
+            # Update an existing tag with a new value
+                if new_value is not None:
+                    if does_image_have_tags:
+                        tags_to_add = set(tags) - set(current_tags)
+                        tags_to_remove = set(current_tags) & set(tags)
+
+                        tags_set = (set(tags_list) - tags_to_remove) | tags_to_add
+                        tags_list = list(tags_set)
+                    else:
+                        # If does_image_have_tags is False, you can decide if there's a specific update logic
+                        print("does_image_have_tags is False, skipping update.")                            
+                else:
+                    print("Missing new_value for 'update' command.")
+                    return
+        elif command == 'clear':
+            # Clear all tags
+            tags_list = []
+        elif command == 'count':
+            # Get the count of tags
+            print(f"Exif tags {command} completed successfully.")
+            if does_image_have_tags == True:
+                return len(tags_list)
+            else:
+                return 0
+        elif command == 'search':
+            # Check if a specific tag exists
+            if does_image_have_tags == True:
+                print(f"Exif tags {command}ed successfully.")
+                return any(tag in current_tags for tag in tags)
+            else:
+                return ''
+        else:
+            print("Invalid command. Please use 'add', 'remove', 'show', 'update', 'clear', 'count', or 'search'.")
+            return
+
+        # Check if the tags have changed
+        if does_image_have_tags == True:
+            #remove dupes
+            new_tags_set = set(tags_list)
+            #remove empty/null
+            new_tags_set = {value for value in new_tags_set if value}
+
+        if does_image_have_tags == False or len(tags_list) > 0:
+            if does_image_have_tags == False:
+                print(f"no tags originally.  Need to add tags {str(list(tags_list))}.")
+            else:
+                print(f"need to add tags {str(list(tags_list))}.  Current tags are {str(list(current_tags))}")
+
+        #if updated_tags_string != tags_string_concat:
+            # Encode the modified tags string and update the Exif data
+            # Join the modified tags list into a string
+            updated_tags_string = ';'.join(tags_list)
+
+            #exifdata[custom_tag] = updated_tags_string.encode('utf-16')
+            exifdata[custom_tag] = updated_tags_string.encode('utf-16le')
+
+            # Save the image with updated Exif data
+            image.save(filename, exif=exifdata)
+            print(f"Exif tags {command}ed successfully to {filename}.")
+            os.utime(filename, (original_atime, original_mtime))
+            print(f"atime and mtime restored.")
+        else:
+            print(f"No changes in tags for file {filename}. File not updated.")
+    else:
+        print(f"File not found: {filename}")
+
+def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
+    # Check if the file exists
+    tags_list = []
+    does_image_have_tags = False
+    if os.path.exists(filename):
+        # Open the image
+
+        original_mtime = os.path.getmtime(filename)
+        original_atime = os.path.getatime(filename)
+
+        image = Image.open(filename)
+
+        # Get the Exif data
+        exifdata = image.getexif()
 
         # Convert single tag to a list
         if isinstance(tags, str):
@@ -787,9 +1110,9 @@ if os.path.exists(localoverridesfile):
 else:
     print("local override file would be " + localoverridesfile)
 
-
-
+CHECK_ISTAGGED= False
 RE_SPECIAL = re.compile(r'([\\()])')
+st = StanfordNERTagger (get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', get_script_path() + '/stanford-ner/stanford-ner.jar')
 
 if gui == True:
     #photo = None
@@ -821,72 +1144,114 @@ else:
     for root, dirs, files in os.walk(defaultdir):
         for filename in files:
             if filename.lower().endswith(('.jpg', '.jpeg','.png')):
-                try:
-                    fullpath = os.path.join(root,filename)
+                fullpath = os.path.join(root,filename)
+                if CHECK_ISTAGGED:
+                    tmp,istagged = get_description_keywords_tag(fullpath,True)
+                else:
+                    tmp = get_description_keywords_tag(fullpath)
+                    istagged = False
+                
+                if not istagged:
+                    try:
+
                     
-                    # for each,desc in modelarray.items():
+                        # for each,desc in modelarray.items():
 
-                    #     print("using: " + each)
+                        #     print("using: " + each)
 
-                    #     processor = BlipProcessor.from_pretrained(desc)
-                    #     model = BlipForConditionalGeneration.from_pretrained(desc)
+                        #     processor = BlipProcessor.from_pretrained(desc)
+                        #     model = BlipForConditionalGeneration.from_pretrained(desc)
 
-                    #     image = Image.open(fullpath).convert('RGB')
+                        #     image = Image.open(fullpath).convert('RGB')
 
-                    #     inputs = processor(image, return_tensors="pt")
+                        #     inputs = processor(image, return_tensors="pt")
 
-                    #     out = model.generate(**inputs)
-                    #     print(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
-                    
-                    #     print("press a key to continue")
-                    #     input()
-                    # break
+                        #     out = model.generate(**inputs)
+                        #     print(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
+                        
+                        #     print("press a key to continue")
+                        #     input()
+                        # break
 
-                    #result = ddb(fullpath)
-                    
-                    #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
-                    #print(f"{fullpath} . {str(result)} . wd14-vit-v2") 
-                    #result = image_to_wd14_tags(fullpath,'wd14-convnext')
-                    #print(f"{fullpath} . {str(result)} . wd14-convnext")#377MB model.onnx
-                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-moat-tagger-v2')
-                    #print(f"{fullpath} . {str(result)} . wd-v1-4-moat-tagger-v2")#377MB model.onnx
-                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-swinv2-tagger-v2')
-                    #print(f"{fullpath} . {str(result)} . wd-v1-4-swinv2-tagger-v2")#377MB model.onnx
-                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-convnext-tagger-v2')
-                    #print(f"{fullpath} . {str(result)} . wd-v1-4-convnext-tagger-v2")#377MB model.onnx
-                    result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
-                    print(f"{fullpath} . {str(result)} . wd-v1-4-convnextv2-tagger-v2")#377MB model.onnx
-                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-vit-tagger-v2')
-                    #print(f"{fullpath} . {str(result)} . wd-v1-4-vit-tagger-v2")#377MB model.onnx
+                        #result = ddb(fullpath)
+                        #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
+                        #print(f"{fullpath} . {str(result)} . wd14-vit-v2") 
+                        #result = image_to_wd14_tags(fullpath,'wd14-convnext')
+                        #print(f"{fullpath} . {str(result)} . wd14-convnext")#377MB model.onnx
+                        #result = image_to_wd14_tags(fullpath,'wd-v1-4-moat-tagger-v2')
+                        #print(f"{fullpath} . {str(result)} . wd-v1-4-moat-tagger-v2")#377MB model.onnx
+                        #result = image_to_wd14_tags(fullpath,'wd-v1-4-swinv2-tagger-v2')
+                        #print(f"{fullpath} . {str(result)} . wd-v1-4-swinv2-tagger-v2")#377MB model.onnx
+                        #result = image_to_wd14_tags(fullpath,'wd-v1-4-convnext-tagger-v2')
+                        #print(f"{fullpath} . {str(result)} . wd-v1-4-convnext-tagger-v2")#377MB model.onnx
+                        result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
+                        #print(f"{fullpath} . {str(result)} . wd-v1-4-convnextv2-tagger-v2")#377MB model.onnx
+                        #result = image_to_wd14_tags(fullpath,'wd-v1-4-vit-tagger-v2')
+                        #print(f"{fullpath} . {str(result)} . wd-v1-4-vit-tagger-v2")#377MB model.onnx
+                        mylist =[]
+                        if tmp is not False:
+                            for k,v in tmp.items():
+                                    if isinstance(v, list):
+                                        for each in v:
+                                            #mylist.append(each)
+                                            if ',' in each or ';' in each:
+                                                    # If either a comma or semicolon is present in the value
+                                                    tags = [tag.strip() for tag in re.split('[,;]', each)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                                    mylist = mylist + tags
+                                            else:
+                                                mylist.append(each)
+                                    else:
+                                        if ',' in each or ';' in v:
+                                            # If either a comma or semicolon is present in the value
+                                            tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                            mylist = mylist + tags
+                                        else:
+                                            mylist.append(v)
 
-                    #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
-                    #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
-                    #result = image_to_wd14_tags(fullpath,'ViT-H-14/laion2b_s32b_b79')
-                    #print(f"{fullpath} . {str(result)} . ViT-H-14/laion2b_s32b_b79")
-                    #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
-                    #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
+                                    
+                            #mylist = list(set(mylist))
+                            mylist = list(set(filter(None, mylist))) #remove duplicates and empty values
+                            mylist = [value for value in mylist if len(value) >= 3]  # Remove values under 3 characters in length
 
-                    #test = blip2_opt_2_7b(fullpath)
-                    #test = blip_large(fullpath)
-                    #test = unumcloud(fullpath)
-                    #test = nlpconnect(fullpath)
-                    #print(f"{fullpath} . {str(test)}")
-                    #exit()
+                        #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
+                        #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
+                        #result = image_to_wd14_tags(fullpath,'ViT-H-14/laion2b_s32b_b79')
+                        #print(f"{fullpath} . {str(result)} . ViT-H-14/laion2b_s32b_b79")
+                        #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
+                        #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
 
-                    if result is not None:
-                        result2 = result[1]
+                        #test = blip2_opt_2_7b(fullpath)
+                        #test = blip_large(fullpath)
+                        #test = unumcloud(fullpath)
+                        #test = nlpconnect(fullpath)
+                        #print(f"{fullpath} . {str(test)}")
+                        #exit()
+                        isperson = False
+                        if result is not None:
+                            result2 = result[1]
+                            if len(mylist) > 0:
+                                result2 = result2 + mylist
+                            test = ' '.join(result2).replace('/',' ').replace("\\",' ')
+                            if is_person(test):
+                                #print(f" means it's is_person")
+                                isperson = True
+                                result2.append("ISPERSON")
+                            #for res in test:
+                            #    if is_person(res):
+                            #        res.append(f" {res} means it's is_person")
 
-                        if len(result2) > 0:
-                            print(str(result2))
-                            tagname = 'XPKeywords'
-                            #tagname = 'EXIF:XPKeywords'
-                            if filename.lower().endswith(('.png')):
-                                write_pnginfo(fullpath, result2)
-                            elif filename.lower().endswith(('.jpg')):
-                                modify_exif_tags(fullpath, result2, 'add',None,tagname)
+                            if len(result2) > 0:
+                                #print(str(result2))
+                                tagname = 'XPKeywords'
+                                #tagname = 'EXIF:XPKeywords'
+                                if filename.lower().endswith(('.png')):
+                                    write_pnginfo(fullpath, result2)
+                                elif filename.lower().endswith(('.jpg')):
+                                    #modify_exif_tags(fullpath, result2, 'add',None,tagname)
+                                    apply_description_keywords_tag(fullpath,result2,True)
+                            else:
+                                print("stuff detected but not relevant/length 0")
                         else:
-                            print("stuff detected but not relevant/length 0")
-                    else:
-                        print(f"nothing detected for {fullpath}.  Odd")
-                except Exception as e:
-                    print(f"oops.  {e}")
+                            print(f"nothing detected for {fullpath}.  Odd")
+                    except Exception as e:
+                        print(f"oops.  {e}")
