@@ -2,7 +2,7 @@ import os
 import shutil
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-
+import json
 import re
 from datetime import datetime
 
@@ -27,7 +27,129 @@ def getseed(mystr):
     except:
         return None
     return res
+
+def unquote(text):
+    if len(text) == 0 or text[0] != '"' or text[-1] != '"':
+        return text
+
+    try:
+        return json.loads(text)
+    except Exception:
+        return text
     
+def parse_generation_parameters(x: str):
+    """parses generation parameters string, the one you see in text field under the picture in UI:
+```
+girl with an artist's beret, determined, blue eyes, desert scene, computer monitors, heavy makeup, by Alphonse Mucha and Charlie Bowater, ((eyeshadow)), (coquettish), detailed, intricate
+Negative prompt: ugly, fat, obese, chubby, (((deformed))), [blurry], bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), messy drawing
+Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model hash: 45dee52b
+```
+
+    returns a dict with field values
+    """
+
+    re_param_code = r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)'
+    re_param = re.compile(re_param_code)
+    re_imagesize = re.compile(r"^(\d+)x(\d+)$")
+    re_hypernet_hash = re.compile("\(([0-9a-f]+)\)$")
+    if 'Template' in x:
+        print("has template")
+
+    res = {}
+
+    prompt = ""
+    negative_prompt = ""
+
+    done_with_prompt = False
+
+    *lines, lastline = x.strip().split("\n")
+    if len(re_param.findall(lastline)) < 3:
+        lines.append(lastline)
+        lastline = ''
+
+    for line in lines:
+        line = line.strip()
+        if line.startswith("Negative prompt:"):
+            done_with_prompt = True
+            line = line[16:].strip()
+        if done_with_prompt:
+            negative_prompt += ("" if negative_prompt == "" else "\n") + line
+        else:
+            prompt += ("" if prompt == "" else "\n") + line
+
+    res["Prompt"] = prompt
+    res["Negative prompt"] = negative_prompt
+
+    for k, v in re_param.findall(lastline):
+        try:
+            if len(v) > 0:
+                if v[0] == '"' and v[-1] == '"':
+                    v = unquote(v)
+
+                m = re_imagesize.match(v)
+                if m is not None:
+                    res[f"{k}-1"] = m.group(1)
+                    res[f"{k}-2"] = m.group(2)
+                else:
+                    res[k] = v
+            else:
+                print(f"ignoring key {k} as value is empty")
+        except Exception as e:
+            print(f"Error parsing \"{k}: {v}\" {e}")
+
+    # Missing CLIP skip means it was set to 1 (the default)
+    if "Clip skip" not in res:
+        res["Clip skip"] = "1"
+
+    hypernet = res.get("Hypernet", None)
+    if hypernet is not None:
+        res["Prompt"] += f"""<hypernet:{hypernet}:{res.get("Hypernet strength", "1.0")}>"""
+
+    if "Hires resize-1" not in res:
+        res["Hires resize-1"] = 0
+        res["Hires resize-2"] = 0
+
+    if "Hires sampler" not in res:
+        res["Hires sampler"] = "Use same sampler"
+
+    if "Hires checkpoint" not in res:
+        res["Hires checkpoint"] = "Use same checkpoint"
+
+    if "Hires prompt" not in res:
+        res["Hires prompt"] = ""
+
+    if "Hires negative prompt" not in res:
+        res["Hires negative prompt"] = ""
+
+    #restore_old_hires_fix_params(res)
+
+    # Missing RNG means the default was set, which is GPU RNG
+    if "RNG" not in res:
+        res["RNG"] = "GPU"
+
+    if "Schedule type" not in res:
+        res["Schedule type"] = "Automatic"
+
+    if "Schedule max sigma" not in res:
+        res["Schedule max sigma"] = 0
+
+    if "Schedule min sigma" not in res:
+        res["Schedule min sigma"] = 0
+
+    if "Schedule rho" not in res:
+        res["Schedule rho"] = 0
+
+    if "VAE Encoder" not in res:
+        res["VAE Encoder"] = "Full"
+
+    if "VAE Decoder" not in res:
+        res["VAE Decoder"] = "Full"
+
+    #skip = set(shared.opts.infotext_skip_pasting)
+    #res = {k: v for k, v in res.items() if k not in skip}
+
+    return res
+
 def findtags(inputstring):
     inputstring = inputstring.replace("\r", "")
     inputstring = inputstring.replace("\n", "")
@@ -49,6 +171,49 @@ def get_sanitized_download_time(filepath):
     # Return the sanitized datetime string
     return sanitized_dt_string
 
+def has_parameters(filepath, extended=False):
+
+    if os.path.exists(filepath) and os.path.isfile(filepath):
+        if filepath.endswith(".png"):
+            with Image.open(filepath) as img:
+                try:
+                    parameter = img.info.get("parameters")
+                    if parameter is not None:
+                        print(filepath + " has metadata.")
+                        if extended == True:
+                            res = parse_generation_parameters(parameter)
+                            if 'Prompt' in res and 'Seed' in res and 'Sampler' in res:
+                                #highlevel looks valid
+                                return res, True
+                            else:
+                                print("insufficient parameters to be considered a prompt")
+                                return None, False
+                        else:
+                            return True
+                    else:
+                        print("PNG with no metadata")
+                        return False
+                except Exception as e:
+                    print("damaged png file")
+        else:
+            print("non png files don't have parameters")
+            if extended == True:
+                return None, False
+            else:
+                return False
+
+def getloras(parameter):
+
+    matches = re.findall(r'<lora:(.*?):', parameter)
+    loras = '_'.join(set(matches))
+
+    #loras = '_'.join(matches)
+
+    if len(loras) >0:
+        #print("Lora !")
+        return loras
+    else:
+        return None
 
 def move_to_subfolder(path, subfolder):
     # Check if the path is a directory or a file
@@ -95,33 +260,22 @@ def move_to_subfolder(path, subfolder):
 
 
 path = cwd = os.getcwd()
-path = "c:\\users\\simon\\Downloads\\stable-diffusion\\consolidated\\Sort"
+path = 'X:\\dif\\stable-diffusion-webui-docker\\output\\txt2img'
+#path = "c:\\users\\simon\\Downloads\\stable-diffusion\\consolidated\\Sort"
 #for filename in os.listdir("."):
 for root, dirs, files in os.walk(path):
     for filename in files:
         item_path = os.path.join(root, filename)
 
         if os.path.isfile(item_path):
-        
+            
             badfile = False
             hasparameters = False
-
-            if filename.endswith(".png"):
-                with Image.open(item_path) as img:
-                    try:
-                        parameter = img.info.get("parameters")
-                        if parameter is not None:
-                            print(filename + " has metadata.")
-                        else:
-                            print("PNG with no metadata")
-                            badfile = True
-                    except:
-                        badfile = True
-            elif filename.endswith(".jpeg") or filename.endswith(".jpg"):
-                badfile = True
+            parameter, result = has_parameters(item_path, True)
+            if result:
+                print("has parameters")
             else:
-                print("Ignoring unsupported filetype: " + filename)
-                continue
+                badfile = True
 
             if badfile==True:
                 print(filename + " has no metadata.  Moving to nometa subdirectory")
@@ -133,8 +287,10 @@ for root, dirs, files in os.walk(path):
                 Loras = ""
                 new_filename = ""
 
-                model = getmodel(parameter)
-                seed = getseed(parameter)
+                if 'Model' in parameter:
+                    model = parameter['Model']
+                if 'Seed' in parameter:
+                    seed = parameter['Seed']
 
                 if model is not None:
                     new_filename = model + '_'
@@ -146,29 +302,15 @@ for root, dirs, files in os.walk(path):
                 else:
                     new_filename = new_filename + "noseed_"
 
-
-                new_filename = new_filename + '_' + get_sanitized_download_time(item_path) + '_'
+                new_filename = new_filename + get_sanitized_download_time(item_path) + '_'
                 # os.path.splitext(filename)[1]
 
-                if 'lora:' in parameter:
-                    # Use a regular expression to find all words between lora: and :?>
-
-                    if "Negative prompt" in parameter:
-                        parts = parameter.split("Negative prompt", 1)
-                    else:
-                        parts = re.split(r'[\r\n]+', parameter)
-                        #parts = re.split(r'[\r\n]Steps', parameter)
-
-                    if len(parts) > 1:
-                        matches = re.findall(r'lora:(.*?):', parts[0])
-                        Loras = '_'.join(matches)
-
-                        tags = findtags(parts[0])
-                    else:
-                        print("Prompt me")
-
-
-                    new_filename = new_filename + 'Loras_' + Loras + '_'
+                if 'lora' in str(parameter).lower():
+                    Loras = getloras(parameter['Prompt'])
+                    if Loras != None:
+                        foundlora = True
+                        print(f"loras: {Loras}")
+                        new_filename = new_filename + 'Loras_' + Loras + '_'
                 else:
                     print("uses no Loras")
 

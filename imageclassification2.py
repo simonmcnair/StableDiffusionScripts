@@ -21,6 +21,30 @@ __author__='Simon McNair'
 #pip install tensorflow
 #sudo apt-get install python3-tk
 
+#nlpconnect
+from transformers import pipeline
+
+#blip2_opt_2_7b
+import torch
+from PIL import Image
+from transformers import Blip2Processor, Blip2ForConditionalGeneration
+from transformers import AutoModelForCausalLM
+from transformers import BitsAndBytesConfig
+
+#blip_large
+#import torch
+from torchvision import transforms
+import json
+import urllib, urllib.request
+
+#Blip_large
+from transformers import BlipProcessor, BlipForConditionalGeneration
+
+#unumcloud(image):
+from transformers import AutoModel, AutoProcessor
+#import torch
+
+
 import pandas as pd
 import cv2
 import numpy as np
@@ -32,6 +56,8 @@ from exiftool import ExifToolHelper
 
 #importing libraries
 import os
+import re
+
 #import glob
 
 from PIL.ExifTags import TAGS
@@ -54,6 +80,7 @@ import tkinter as tk
 import nltk
 from nltk.tag.stanford import StanfordNERTagger 
 nltk.download('punkt')
+
 #sudo apt-get install default-jre-headless
 #wget https://nlp.stanford.edu/software/stanford-ner-4.2.0.zip
 #unzip stanford-ner-4.2.0.zip
@@ -105,14 +132,12 @@ def ddb(imagefile):
 
     #os.environ["CUDA_VISIBLE_DEVICES"]=""
 
-    import torch
     # Load the model
 
     model = torch.hub.load('RF5/danbooru-pretrained', 'resnet50')
     model.eval()
 
 
-    from torchvision import transforms
     input_image = Image.open(imagefile) # load an image of your choice
     preprocess = transforms.Compose([
         transforms.Resize(360),
@@ -129,8 +154,7 @@ def ddb(imagefile):
     with torch.no_grad():
         output = model(input_batch)
 
-    import json
-    import urllib, urllib.request
+
 
     with urllib.request.urlopen("https://github.com/RF5/danbooru-pretrained/raw/master/config/class_names_6000.json") as url:
         class_names = json.loads(url.read().decode())
@@ -149,8 +173,6 @@ def ddb(imagefile):
 
 
 def unumcloud(image):
-    from transformers import AutoModel, AutoProcessor
-    import torch
     model = AutoModel.from_pretrained("unum-cloud/uform-gen2-qwen-500m", trust_remote_code=True)
     processor = AutoProcessor.from_pretrained("unum-cloud/uform-gen2-qwen-500m", trust_remote_code=True)
 
@@ -185,11 +207,7 @@ def prepend_string_to_filename(fullpath, prefix):
     return new_fullpath
 
 def nlpconnect(fileinput):
-
-    from transformers import pipeline
-
     image_to_text = pipeline("image-to-text", model="nlpconnect/vit-gpt2-image-captioning")
-
     return image_to_text(fileinput)
 
 def blip2_opt_2_7b(inputfile):
@@ -199,11 +217,7 @@ def blip2_opt_2_7b(inputfile):
     # pip install -q -U git+https://github.com/huggingface/transformers.git
     # pip install -q -U git+https://github.com/huggingface/peft.git
     # pip install -q -U git+https://github.com/huggingface/accelerate.git
-    import torch
-    from PIL import Image
-    from transformers import Blip2Processor, Blip2ForConditionalGeneration
-    from transformers import AutoModelForCausalLM
-    from transformers import BitsAndBytesConfig
+
 
 
     nf4_config = BitsAndBytesConfig(
@@ -228,6 +242,12 @@ def blip2_opt_2_7b(inputfile):
     out = model.generate(**inputs)
     print(processor.decode(out[0], skip_special_tokens=True).strip())
 
+def use_GPU_interrogation(image_path,clip_model_name="ViT-L-14/openai"):
+    image = Image.open(image_path).convert('RGB')
+    ci = Interrogator(Config(clip_model_name))
+    return (ci.interrogate(image))
+
+
 def get_description_keywords_tag(filetoproc, istagged=False):
     res = {}
     taglist =[]
@@ -240,7 +260,6 @@ def get_description_keywords_tag(filetoproc, istagged=False):
     taglist.append("EXIF:XPKeywords") #string
     taglist.append("XMP:subject")
     keywordlist = []
-    import re
     tagged = False
     if istagged:
         taglist.append('XMP:tagged')
@@ -270,16 +289,18 @@ def get_description_keywords_tag(filetoproc, istagged=False):
                 for key, value in res.items():
                     if isinstance(value, list):
                         res[key] = list(set(value))
-        if istagged:
-            return res,tagged
-        else:
-            return res
+                if len(res) == 0: res = False
     except Exception as e:
         print(f"Error {e}")
-        return False
+        res = False
+        tagged = True
+    
+    if istagged:
+        return res,tagged
+    else:
+        return res
     
 def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False):
-    #from difflib import ndiff
     res = {}
     taglist =[]
     taglist.append("IPTC:Keywords")#list
@@ -348,15 +369,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     if ',' in v or ';' in v:
                                         tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
                                         for val in valuetoinsert:
-                                            #if ',' in val or ';' in val:
-                                            #res = [tag.strip() for tag in re.split('[,;]', val)]
-                                            #for ea in val:
                                                 if val not in v and len(val) >3:
                                                     copyofkeywordlist.append(val)
-                                          #      else:
-                                          #          print(f"{val} already in metadata or less than 4 characters in length")
-                                            #else:
-                                            #    copyofkeywordlist.append(val.strip())
                                         if len(copyofkeywordlist) >0:
                                             res[k] = ';'.join(copyofkeywordlist)
                                     else:
@@ -368,24 +382,22 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
 
                         process[k] = len(copyofkeywordlist)
                         
-                    #diff = list(ndiff(d, res))
-                    #print("".join(diff))
                 if any(value != 0 for value in process.values()):
                 #if any(value != 0 for value in process):
+                    print(f"needs updating {sum(value for value in process.values())} tags need updating")
                     if markasprocessed:
                         res['XMP:tagged'] = "true"
                     et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
                     print(f"{et.last_stdout}")
                     return True
-                else:
-                    print(f"No modifications required to {filetoproc}")
-
-                if markasprocessed and not tagged:
-                    print(f"Marked {filetoproc} as tagged")
+                elif markasprocessed and not tagged:
+                    print(f"Force marked {filetoproc} as tagged due to config")
                     res['XMP:tagged'] = True
                     et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
                     print(f"{et.last_stdout}")
                     return True
+                else:
+                    print(f"No modifications required to {filetoproc}")
                 
             else:
                 deletestring = ""
@@ -399,8 +411,6 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         return False
 
 def blip_large(imagepath,model='small'):
-
-    from transformers import BlipProcessor, BlipForConditionalGeneration
 
     if model == 'small':
         processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
@@ -1110,10 +1120,12 @@ if os.path.exists(localoverridesfile):
 else:
     print("local override file would be " + localoverridesfile)
 
-CHECK_ISTAGGED= False
+CHECK_ISTAGGED= True
+gpu = True
 RE_SPECIAL = re.compile(r'([\\()])')
 st = StanfordNERTagger (get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', get_script_path() + '/stanford-ner/stanford-ner.jar')
 
+model_loaded = False
 if gui == True:
     #photo = None
     root = tk.Tk()
@@ -1143,8 +1155,9 @@ else:
 
     for root, dirs, files in os.walk(defaultdir):
         for filename in files:
+            fullpath = os.path.join(root,filename)
+            print(f"{fullpath} - Processing")
             if filename.lower().endswith(('.jpg', '.jpeg','.png')):
-                fullpath = os.path.join(root,filename)
                 if CHECK_ISTAGGED:
                     tmp,istagged = get_description_keywords_tag(fullpath,True)
                 else:
@@ -1152,8 +1165,9 @@ else:
                     istagged = False
                 
                 if not istagged:
+                    print(f"{fullpath} - Not tagged continuing")
                     try:
-
+                        result = None
                     
                         # for each,desc in modelarray.items():
 
@@ -1184,7 +1198,13 @@ else:
                         #print(f"{fullpath} . {str(result)} . wd-v1-4-swinv2-tagger-v2")#377MB model.onnx
                         #result = image_to_wd14_tags(fullpath,'wd-v1-4-convnext-tagger-v2')
                         #print(f"{fullpath} . {str(result)} . wd-v1-4-convnext-tagger-v2")#377MB model.onnx
-                        result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
+                        if gpu == True:
+                            result = use_GPU_interrogation(fullpath)
+                        else:
+                            result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
+
+                        if result == None:
+                            print("nothing retruend from interrogation")
                         #print(f"{fullpath} . {str(result)} . wd-v1-4-convnextv2-tagger-v2")#377MB model.onnx
                         #result = image_to_wd14_tags(fullpath,'wd-v1-4-vit-tagger-v2')
                         #print(f"{fullpath} . {str(result)} . wd-v1-4-vit-tagger-v2")#377MB model.onnx
@@ -1255,3 +1275,8 @@ else:
                             print(f"nothing detected for {fullpath}.  Odd")
                     except Exception as e:
                         print(f"oops.  {e}")
+                else:
+                    print(f"{fullpath} - Tagged as processed.  Skipping")
+                print(f"{fullpath} - Processing complete")
+            else:
+                print(f"{fullpath} - Unsupported filetype.  Not an image.")
