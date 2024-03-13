@@ -20,30 +20,7 @@ __author__='Simon McNair'
 #pip install keras
 #pip install tensorflow
 #sudo apt-get install python3-tk
-
-#nlpconnect
-from transformers import pipeline
-
-#blip2_opt_2_7b
 import torch
-from PIL import Image
-from transformers import Blip2Processor, Blip2ForConditionalGeneration
-from transformers import AutoModelForCausalLM
-from transformers import BitsAndBytesConfig
-
-#blip_large
-#import torch
-from torchvision import transforms
-import json
-import urllib, urllib.request
-
-#Blip_large
-from transformers import BlipProcessor, BlipForConditionalGeneration
-
-#unumcloud(image):
-from transformers import AutoModel, AutoProcessor
-#import torch
-
 
 import pandas as pd
 import cv2
@@ -68,6 +45,7 @@ from PIL import PngImagePlugin, Image
 #import piexif
 #import piexif.helper
 
+import clip_interrogator
 from clip_interrogator import Config, Interrogator, list_clip_models
 import platform
 from transformers import BlipProcessor, BlipForConditionalGeneration
@@ -127,10 +105,76 @@ def is_person(snippet):
             #    return True  
     return
 
+def torch_gc():
+    if torch.cuda.is_available():
+        with torch.cuda.device('cuda'):
+            import gc
+            #print("mem before")
+            #print(torch.cuda.memory_summary(device=None, abbreviated=False))
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+            gc.collect()
+            #del variables
+
+            #print("mem after")
+            #print(torch.cuda.memory_summary(device=None, abbreviated=False))
+
+def low_vram():
+    if torch.cuda.is_available():
+        vram_total_mb = torch.cuda.get_device_properties('cuda').total_memory / (1024**2)
+        vram_info = f"GPU VRAM: **{vram_total_mb:.2f}MB**"
+        if vram_total_mb< 8:
+            vram_info += "<br>Using low VRAM configuration"
+            print(f"{vram_info}")
+    if vram_total_mb <= '4': return False 
+    return True
+
+def return_vram():
+    if torch.cuda.is_available():
+        vram_total_mb = torch.cuda.get_device_properties('cuda').total_memory / (1024**2)
+    return vram_total_mb
+
+
+def load(clip_model_name):
+    global ci
+    if ci is None:
+        print(f"Loading CLIP Interrogator {clip_interrogator.__version__}...")
+
+        config = Config(
+            cache_path = 'models/clip-interrogator',
+            clip_model_name=clip_model_name,
+        )
+
+        if low_vram:
+            print("low vram")
+            config.apply_low_vram_defaults()
+            config.chunk_size = 512
+        ci = Interrogator(config)
+
+    if clip_model_name != ci.config.clip_model_name:
+
+
+        ci.config.clip_model_name = clip_model_name
+        torch_gc()
+        #with Timer() as modelloadtime:
+        ci.load_clip_model()
+        #print(f"loading model took {modelloadtime.last} to load")
+        #return res, modelloadtime.last
+
 
 def ddb(imagefile):
 
     #os.environ["CUDA_VISIBLE_DEVICES"]=""
+
+    #blip_large
+    import torch
+    from torchvision import transforms
+    import json
+    import urllib, urllib.request
+
+    #Blip_large
+    from transformers import BlipProcessor, BlipForConditionalGeneration
+
 
     # Load the model
 
@@ -173,6 +217,10 @@ def ddb(imagefile):
 
 
 def unumcloud(image):
+
+    #unumcloud(image):
+    from transformers import AutoModel, AutoProcessor
+    import torch
     model = AutoModel.from_pretrained("unum-cloud/uform-gen2-qwen-500m", trust_remote_code=True)
     processor = AutoProcessor.from_pretrained("unum-cloud/uform-gen2-qwen-500m", trust_remote_code=True)
 
@@ -207,11 +255,19 @@ def prepend_string_to_filename(fullpath, prefix):
     return new_fullpath
 
 def nlpconnect(fileinput):
+    #nlpconnect
+    from transformers import pipeline
+
     image_to_text = pipeline("image-to-text", model="nlpconnect/vit-gpt2-image-captioning")
     return image_to_text(fileinput)
 
 def blip2_opt_2_7b(inputfile):
-
+    #blip2_opt_2_7b
+    import torch
+    from PIL import Image
+    from transformers import Blip2Processor, Blip2ForConditionalGeneration
+    from transformers import AutoModelForCausalLM
+    from transformers import BitsAndBytesConfig
     # pip install accelerate bitsandbytes
     # pip install -q -U bitsandbytes
     # pip install -q -U git+https://github.com/huggingface/transformers.git
@@ -242,10 +298,20 @@ def blip2_opt_2_7b(inputfile):
     out = model.generate(**inputs)
     print(processor.decode(out[0], skip_special_tokens=True).strip())
 
-def use_GPU_interrogation(image_path,clip_model_name="ViT-L-14/openai"):
+def use_GPU_interrogation(image_path,model_name="ViT-L-14/openai"):
+    
+    load("ViT-L-14/openai")
+        #models = list_clip_models()
+    #print(f"supported models are {models}")
+    print("load image")
     image = Image.open(image_path).convert('RGB')
-    ci = Interrogator(Config(clip_model_name))
-    return (ci.interrogate(image))
+    print("convert RGB")
+    #ci = Interrogator(Config(clip_model_name=model_name))
+    #print("create CI")
+    res = ci.interrogate(image)
+    print ("interrogation complete")
+    print(res)
+    return (res)
 
 
 def get_description_keywords_tag(filetoproc, istagged=False):
@@ -300,7 +366,23 @@ def get_description_keywords_tag(filetoproc, istagged=False):
     else:
         return res
     
-def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False):
+def has_duplicates(lst):
+    seen = set()
+    cnt = 0
+    dupes =[]
+    for item in lst:
+        if item in seen:
+            #print(f"DUPE !.  {item} seen before in {lst}")
+            dupes.append(item)
+            cnt += 1
+            #return True
+        seen.add(item)
+    if cnt >0:
+        print(f"{cnt} duplicates in list. {dupes}")
+        return True
+    return False
+
+def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False,dedupe=False):
     res = {}
     taglist =[]
     taglist.append("IPTC:Keywords")#list
@@ -310,7 +392,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     #taglist.append("XMP:CatalogSets")
     taglist.append("XMP:LastKeywordXMP")
     taglist.append("EXIF:XPKeywords") #string
-    taglist.append("XMP:subject")
+    taglist.append("XMP-dc:subject")
 
     tagged = False
     if not markasprocessed:
@@ -328,6 +410,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         keywordlist = None
 
     process = {}
+    dedupedkeywords = {}
+    dupes = False
     try:
         with ExifToolHelper() as et:
             if keywordlist != None:
@@ -336,6 +420,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         print("debbug")
                     for k, v in d.items():
                         #print(f"Dict: {k} = {v}")
+                        allkeywordsincpotentialdupes = []    
                         copyofkeywordlist = []
                         if k != 'SourceFile' and k != 'XMP:Tagged':
                             #if k == 'IPTC:Keywords' or k == 'XMP:LastKeywordXMP':
@@ -346,6 +431,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                             for one in tags:
                                                 valtoinsert = one.strip()
                                                 if len(valtoinsert)>3:
+                                                    allkeywordsincpotentialdupes.append(valtoinsert)
                                                     if valtoinsert not in v:
                                                         copyofkeywordlist.append(valtoinsert)
                                                         print(f"{valtoinsert} needs adding")
@@ -354,8 +440,10 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                         elif line not in v:
                                             valtoinsert = str(line).strip()
                                             if len(valtoinsert)>3:
+                                                allkeywordsincpotentialdupes.append(valtoinsert)
                                                 copyofkeywordlist.append(valtoinsert)
                                         elif line in v:
+                                            allkeywordsincpotentialdupes.append(line)
                                             pass
                                             #print(f"{line} already in {v}")
                                         else:
@@ -365,29 +453,76 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                         copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > 3 and str(item).strip() not in setb]
                                         print("Tags ({copyofkeywordlist}) need adding to {k}")
                                         res[k] = copyofkeywordlist
+
+                                    if has_duplicates(allkeywordsincpotentialdupes):
+                                        dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
+                                        dupes = True
                                 else:
                                     if ',' in v or ';' in v:
                                         tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                        #TODO  not even using tags here !
                                         for val in valuetoinsert:
                                                 if val not in v and len(val) >3:
                                                     copyofkeywordlist.append(val)
+                                                    allkeywordsincpotentialdupes.append(val)
                                         if len(copyofkeywordlist) >0:
                                             res[k] = ';'.join(copyofkeywordlist)
                                     else:
-                                        if len(valuetoinsert)>3:
-                                            res[k] = valuetoinsert
+
+                                        #empty value. Populate it
+                                        if len(v) == 0:
+                                            if k != 'EXIF:XPKeywords':
+                                                #They're all lists apart from XPKeywords
+                                                for each in keywordlist:
+                                                    if len(each) >3:
+                                                        copyofkeywordlist.append(each)
+                                                        allkeywordsincpotentialdupes.append(each) 
+                                                res[k] = copyofkeywordlist
+
+                                            else:
+                                                print("this should be EXIF:XPKeywords")
+                                                res[k] = ';'.join(keywordlist)
+                                        else:
+                                            if k != 'EXIF:XPKeywords':
+                                                for each in keywordlist:
+                                                    if len(each) >3:
+                                                        copyofkeywordlist.append(each)
+                                                        allkeywordsincpotentialdupes.append(each) 
+                                                res[k] = copyofkeywordlist
+
+                                            else:
+                                                res[k] = ';'.join(keywordlist)
+
+                                    if has_duplicates(allkeywordsincpotentialdupes):
+                                        dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
+                                        dupes = True
                         elif k == 'XMP:Tagged':
                             #print("test")
                             if v: tagged = True
 
                         process[k] = len(copyofkeywordlist)
-                        
+
+                if dedupe == True and dupes == True:
+                    #deduped = set(allkeywordsincpotentialdupes)
+                    try:
+                        et.set_tags(filetoproc, tags=dedupedkeywords,params=["-P", "-overwrite_original"])
+                        print(f"{et.last_stdout}")
+                    except Exception as e:
+                        print(f"Error {e}")
+                elif dedupe == True and dupes == False:
+                    print("Dupe checking enabled and No dupes found")
+
                 if any(value != 0 for value in process.values()):
                 #if any(value != 0 for value in process):
-                    print(f"needs updating {sum(value for value in process.values())} tags need updating")
+                    print(f"needs updating {sum(value for value in process.values())} tags need updating {res}")
                     if markasprocessed:
                         res['XMP:tagged'] = "true"
-                    et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
+
+                    try:
+                        et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
+                    except Exception as e:
+                        print(f"Error {e}")
+
                     print(f"{et.last_stdout}")
                     return True
                 elif markasprocessed and not tagged:
@@ -1099,6 +1234,8 @@ class ImageTextDisplay:
         # Update the display
         self.show_current()
 
+CHECK_ISTAGGED= True
+gpu = True
 gui = True
 defaultdir = '/folder/to/process'
 
@@ -1120,10 +1257,10 @@ if os.path.exists(localoverridesfile):
 else:
     print("local override file would be " + localoverridesfile)
 
-CHECK_ISTAGGED= True
-gpu = True
 RE_SPECIAL = re.compile(r'([\\()])')
 st = StanfordNERTagger (get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', get_script_path() + '/stanford-ner/stanford-ner.jar')
+ci = None
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,expandable_segments:True"
 
 model_loaded = False
 if gui == True:
@@ -1139,18 +1276,18 @@ if gui == True:
 
 else:
     modelarray = {
-                #'ViT-L-14': 'ViT-L-14/openai',
-                #'ViT-L-14': 'immich-app/ViT-L-14__openai',
-                #'ViT-H-14': 'ViT-H-14/laion2b_s32b_b79',
-       #         'ViT-H-14': 'laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
-                #'wd14': 'wd14-convnext',
-        #        'wd14': 'saltacc/wd-1-4-anime',
+                'ViT-L-14': 'ViT-L-14/openai',
+                'ViT-L-14': 'immich-app/ViT-L-14__openai',
+                'ViT-H-14': 'ViT-H-14/laion2b_s32b_b79',
+                'ViT-H-14': 'laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
+                'wd14': 'wd14-convnext',
+                'wd14': 'saltacc/wd-1-4-anime',
                 'wd' : 'SmilingWolf/wd-v1-4-vit-tagger-v2',
-       #         'blip-base': 'Salesforce/blip-image-captioning-base',   # 990MB
-       #         'blip-large': 'Salesforce/blip-image-captioning-large', # 1.9GB
-            #    'blip2-2.7b': 'Salesforce/blip2-opt-2.7b',              # 15.5GB
-            #    'blip2-flan-t5-xl': 'Salesforce/blip2-flan-t5-xl',      # 15.77GB
-        #        'git-large-coco': 'microsoft/git-large-coco'           # 1.58GB
+                'blip-base': 'Salesforce/blip-image-captioning-base',   # 990MB
+                'blip-large': 'Salesforce/blip-image-captioning-large', # 1.9GB
+                'blip2-2.7b': 'Salesforce/blip2-opt-2.7b',              # 15.5GB
+                'blip2-flan-t5-xl': 'Salesforce/blip2-flan-t5-xl',      # 15.77GB
+                'git-large-coco': 'microsoft/git-large-coco'           # 1.58GB
                 }
 
     for root, dirs, files in os.walk(defaultdir):
@@ -1166,51 +1303,50 @@ else:
                 
                 if not istagged:
                     print(f"{fullpath} - Not tagged continuing")
+                    result = None
+                
+                    # for each,desc in modelarray.items():
+                    #     print("using: " + each)
+                    #     processor = BlipProcessor.from_pretrained(desc)
+                    #     model = BlipForConditionalGeneration.from_pretrained(desc)
+                    #     image = Image.open(fullpath).convert('RGB')
+                    #     inputs = processor(image, return_tensors="pt")
+                    #     out = model.generate(**inputs)
+                    #     print(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
+                    #     print("press a key to continue")
+                    #     input()
+                    # break
+
+                    #result = ddb(fullpath)
+                    #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
+                    #print(f"{fullpath} . {str(result)} . wd14-vit-v2") 
+                    #result = image_to_wd14_tags(fullpath,'wd14-convnext')
+                    #print(f"{fullpath} . {str(result)} . wd14-convnext")#377MB model.onnx
+                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-moat-tagger-v2')
+                    #print(f"{fullpath} . {str(result)} . wd-v1-4-moat-tagger-v2")#377MB model.onnx
+                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-swinv2-tagger-v2')
+                    #print(f"{fullpath} . {str(result)} . wd-v1-4-swinv2-tagger-v2")#377MB model.onnx
+                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-convnext-tagger-v2')
+                    #print(f"{fullpath} . {str(result)} . wd-v1-4-convnext-tagger-v2")#377MB model.onnx
+                    #print(f"{fullpath} . {str(result)} . wd-v1-4-convnextv2-tagger-v2")#377MB model.onnx
+                    #result = image_to_wd14_tags(fullpath,'wd-v1-4-vit-tagger-v2')
+                    #print(f"{fullpath} . {str(result)} . wd-v1-4-vit-tagger-v2")#377MB model.onnx
                     try:
-                        result = None
-                    
-                        # for each,desc in modelarray.items():
-
-                        #     print("using: " + each)
-
-                        #     processor = BlipProcessor.from_pretrained(desc)
-                        #     model = BlipForConditionalGeneration.from_pretrained(desc)
-
-                        #     image = Image.open(fullpath).convert('RGB')
-
-                        #     inputs = processor(image, return_tensors="pt")
-
-                        #     out = model.generate(**inputs)
-                        #     print(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
-                        
-                        #     print("press a key to continue")
-                        #     input()
-                        # break
-
-                        #result = ddb(fullpath)
-                        #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
-                        #print(f"{fullpath} . {str(result)} . wd14-vit-v2") 
-                        #result = image_to_wd14_tags(fullpath,'wd14-convnext')
-                        #print(f"{fullpath} . {str(result)} . wd14-convnext")#377MB model.onnx
-                        #result = image_to_wd14_tags(fullpath,'wd-v1-4-moat-tagger-v2')
-                        #print(f"{fullpath} . {str(result)} . wd-v1-4-moat-tagger-v2")#377MB model.onnx
-                        #result = image_to_wd14_tags(fullpath,'wd-v1-4-swinv2-tagger-v2')
-                        #print(f"{fullpath} . {str(result)} . wd-v1-4-swinv2-tagger-v2")#377MB model.onnx
-                        #result = image_to_wd14_tags(fullpath,'wd-v1-4-convnext-tagger-v2')
-                        #print(f"{fullpath} . {str(result)} . wd-v1-4-convnext-tagger-v2")#377MB model.onnx
                         if gpu == True:
                             result = use_GPU_interrogation(fullpath)
                         else:
                             result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
 
                         if result == None:
-                            print("nothing retruend from interrogation")
-                        #print(f"{fullpath} . {str(result)} . wd-v1-4-convnextv2-tagger-v2")#377MB model.onnx
-                        #result = image_to_wd14_tags(fullpath,'wd-v1-4-vit-tagger-v2')
-                        #print(f"{fullpath} . {str(result)} . wd-v1-4-vit-tagger-v2")#377MB model.onnx
-                        mylist =[]
-                        if tmp is not False:
-                            for k,v in tmp.items():
+                            print("nothing returned from interrogation")
+                    except Exception as e:
+                        print(f"interrogation failed.  {e}")
+                         
+                    #This gets all the tags currently in the file and creates a deduplicated list
+                    mylist =[]
+                    if tmp is not False:
+                        for k,v in tmp.items():
+                                if len(v) > 0:
                                     if isinstance(v, list):
                                         for each in v:
                                             #mylist.append(each)
@@ -1220,61 +1356,69 @@ else:
                                                     mylist = mylist + tags
                                             else:
                                                 mylist.append(each)
+
                                     else:
-                                        if ',' in each or ';' in v:
+                                        if ',' in v or ';' in v:
                                             # If either a comma or semicolon is present in the value
                                             tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
                                             mylist = mylist + tags
                                         else:
                                             mylist.append(v)
+                                else:
+                                    print(f"field {k} is empty")
+                                
 
-                                    
-                            #mylist = list(set(mylist))
-                            mylist = list(set(filter(None, mylist))) #remove duplicates and empty values
-                            mylist = [value for value in mylist if len(value) >= 3]  # Remove values under 3 characters in length
+                    #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
+                    #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
+                    #result = image_to_wd14_tags(fullpath,'ViT-H-14/laion2b_s32b_b79')
+                    #print(f"{fullpath} . {str(result)} . ViT-H-14/laion2b_s32b_b79")
+                    #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
+                    #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
 
-                        #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
-                        #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
-                        #result = image_to_wd14_tags(fullpath,'ViT-H-14/laion2b_s32b_b79')
-                        #print(f"{fullpath} . {str(result)} . ViT-H-14/laion2b_s32b_b79")
-                        #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
-                        #print(f"{fullpath} . {str(result)} . ViT-L-14/openai")
+                    #test = blip2_opt_2_7b(fullpath)
+                    #test = blip_large(fullpath)
+                    #test = unumcloud(fullpath)
+                    #test = nlpconnect(fullpath)
+                    #print(f"{fullpath} . {str(test)}")
+                    #exit()
+                    isperson = False
+                    if result is not None:
+                        result2 = result[1]
+                        #if len(mylist) > 0:
+                        if len(mylist) > 0:
+                            result2 = result2 + mylist
 
-                        #test = blip2_opt_2_7b(fullpath)
-                        #test = blip_large(fullpath)
-                        #test = unumcloud(fullpath)
-                        #test = nlpconnect(fullpath)
-                        #print(f"{fullpath} . {str(test)}")
-                        #exit()
-                        isperson = False
-                        if result is not None:
-                            result2 = result[1]
-                            if len(mylist) > 0:
-                                result2 = result2 + mylist
-                            test = ' '.join(result2).replace('/',' ').replace("\\",' ')
-                            if is_person(test):
-                                #print(f" means it's is_person")
-                                isperson = True
-                                result2.append("ISPERSON")
-                            #for res in test:
-                            #    if is_person(res):
-                            #        res.append(f" {res} means it's is_person")
+                        #mylist = list(set(mylist))
+                        #deduplicate
+                        result2 = list(set(filter(None, result2))) #remove duplicates and empty values
+                        result2 = [value for value in result2 if len(value) >= 3]  # Remove values under 3 characters in length
 
-                            if len(result2) > 0:
-                                #print(str(result2))
-                                tagname = 'XPKeywords'
-                                #tagname = 'EXIF:XPKeywords'
+
+                        test = ' '.join(result2).replace('/',' ').replace("\\",' ')
+                        if is_person(test):
+                            #print(f" means it's is_person")
+                            isperson = True
+                            result2.append("ISPERSON")
+                        #for res in test:
+                        #    if is_person(res):
+                        #        res.append(f" {res} means it's is_person")
+
+                        if len(result2) > 0:
+                            #print(str(result2))
+                            tagname = 'XPKeywords'
+                            #tagname = 'EXIF:XPKeywords'
+                            try:
                                 if filename.lower().endswith(('.png')):
                                     write_pnginfo(fullpath, result2)
                                 elif filename.lower().endswith(('.jpg')):
                                     #modify_exif_tags(fullpath, result2, 'add',None,tagname)
-                                    apply_description_keywords_tag(fullpath,result2,True)
-                            else:
-                                print("stuff detected but not relevant/length 0")
+                                    apply_description_keywords_tag(fullpath,result2,True,True)
+                            except Exception as e:
+                                print(f"writing tags failed.  {e}")
                         else:
-                            print(f"nothing detected for {fullpath}.  Odd")
-                    except Exception as e:
-                        print(f"oops.  {e}")
+                            print("stuff detected but not relevant/length 0")
+                    else:
+                        print(f"nothing detected for {fullpath}.  Odd")
                 else:
                     print(f"{fullpath} - Tagged as processed.  Skipping")
                 print(f"{fullpath} - Processing complete")

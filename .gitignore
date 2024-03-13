@@ -165,3 +165,4 @@ cache/*
 output.json
 stanford-ner/*
 stanford-ner-old/*
+models/*

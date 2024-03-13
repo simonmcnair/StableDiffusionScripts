@@ -17,10 +17,20 @@ def sanitise_filename(filename):
     filename = re.sub(r'_{2,}', '_', filename)
     # Return the sanitized filename
     basefilename, extension = os.path.splitext(filename)
+    basefilename = remove_non_english(basefilename)
     if len(basefilename) > 200:
         filename = basefilename[:200] + extension
     #filename = filename.lower()
     return filename
+
+def remove_non_english(text):
+    # Define a regular expression pattern to match English letters and spaces
+    english_pattern = re.compile("[^a-zA-Z\s]")
+
+    # Use the sub() method to replace non-English characters with an empty string
+    cleaned_text = english_pattern.sub("", text)
+
+    return cleaned_text
 
 
 def get_jpeg_comments(filename):

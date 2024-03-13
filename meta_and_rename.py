@@ -171,36 +171,54 @@ def get_sanitized_download_time(filepath):
     # Return the sanitized datetime string
     return sanitized_dt_string
 
-def has_parameters(filepath, extended=False):
+def remove_non_english(text):
+    # Define a regular expression pattern to match English letters and spaces
+    english_pattern = re.compile("[^a-zA-Z0-9\s!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~]")
+
+    # Use the sub() method to replace non-English characters with an empty string
+    cleaned_text = english_pattern.sub("", text)
+
+    return cleaned_text
+
+def has_parameters(filepath, verify="false"):
 
     if os.path.exists(filepath) and os.path.isfile(filepath):
         if filepath.endswith(".png"):
-            with Image.open(filepath) as img:
-                try:
-                    parameter = img.info.get("parameters")
-                    if parameter is not None:
-                        print(filepath + " has metadata.")
-                        if extended == True:
-                            res = parse_generation_parameters(parameter)
-                            if 'Prompt' in res and 'Seed' in res and 'Sampler' in res:
-                                #highlevel looks valid
-                                return res, True
-                            else:
-                                print("insufficient parameters to be considered a prompt")
-                                return None, False
+            try:
+                with Image.open(filepath) as img:
+                    try:
+                        parameter = img.info.get("parameters")
+                        if parameter is not None:
+                            print(filepath + " has metadata.")
+                            if verify == "basic":
+                                res = parse_generation_parameters(parameter)
+                                if res != None:
+                                    if 'Prompt' in res:
+                                        print("has basic metadata")
+                                        return res, True
+                                    else:
+                                        print("insufficient parameters to be considered a prompt")
+                            elif verify == 'full':
+                                res = parse_generation_parameters(parameter)
+                                #verify just checks for more stuff
+                                if 'Prompt' in res and 'Seed' in res and 'Sampler' in res:
+                                    #highlevel looks valid
+                                    return res, True
+                                else:
+                                    print("insufficient parameters to be considered a prompt")
                         else:
-                            return True
-                    else:
-                        print("PNG with no metadata")
-                        return False
-                except Exception as e:
-                    print("damaged png file")
+                            print("PNG with no metadata")
+                    except Exception as e:
+                        print("damaged png file")
+
+            except Exception as e:
+                print(f"Error {e}")
         else:
             print("non png files don't have parameters")
-            if extended == True:
-                return None, False
-            else:
-                return False
+    if verify == "full" or verify == "basic":
+        return None, False
+    else:
+        return False
 
 def getloras(parameter):
 
@@ -218,11 +236,17 @@ def getloras(parameter):
 def move_to_subfolder(path, subfolder):
     # Check if the path is a directory or a file
 
-    last_folder = os.path.basename(os.path.dirname(path))
+    #last_folder = os.path.basename(os.path.dirname(path))
 
-    if subfolder in last_folder:
-        print(path + " directory tree already contains " + subfolder)
-        return
+    #folders = path.split(os.path.sep)
+
+    if any(subfolder.lower() == folder.lower() for folder in path.split(os.path.sep)):
+
+    # Iterate through each folder and run the custom function
+    #for folder in folders:
+    #    if subfolder.lower() == folder.lower():
+            print(path + " directory tree already has a folder containing " + subfolder)
+            return
 
     if os.path.isdir(path):
         # Create the subfolder if it doesn't exist
@@ -234,7 +258,7 @@ def move_to_subfolder(path, subfolder):
         for file in os.listdir(path):
             if os.path.isfile(os.path.join(path, file)):
                 base_name, ext = os.path.splitext(file)
-                dest_file = os.path.join(subfolder_path, file)
+                dest_file = os.path.join(subfolder_path, file + ext)
                 count = 1
                 while os.path.exists(dest_file):
                     new_name = f"{base_name}_{count}{ext}"
@@ -260,73 +284,72 @@ def move_to_subfolder(path, subfolder):
 
 
 path = cwd = os.getcwd()
+onlyprocess_png = True
 path = 'X:\\dif\\stable-diffusion-webui-docker\\output\\txt2img'
-#path = "c:\\users\\simon\\Downloads\\stable-diffusion\\consolidated\\Sort"
 #for filename in os.listdir("."):
 for root, dirs, files in os.walk(path):
     for filename in files:
         item_path = os.path.join(root, filename)
 
         if os.path.isfile(item_path):
-            
-            badfile = False
+            if onlyprocess_png == True and not item_path.endswith('.png'):
+                continue
+
             hasparameters = False
-            parameter, result = has_parameters(item_path, True)
+            parameter, result = has_parameters(item_path, "basic")
             if result:
                 print("has parameters")
             else:
-                badfile = True
-
-            if badfile==True:
                 print(filename + " has no metadata.  Moving to nometa subdirectory")
                 move_to_subfolder(item_path,"nometa")
+                continue
+
+            model = ""
+            seed = ""
+            Loras = ""
+            new_filename = ""
+
+            if 'Model' in parameter:
+                model = parameter['Model']
+            if 'Seed' in parameter:
+                seed = parameter['Seed']
+
+            if model is not None and model != '':
+                new_filename = model + '_'
             else:
+                new_filename = "nomodel_"
 
-                model = ""
-                seed = ""
-                Loras = ""
-                new_filename = ""
+            if seed is not None and seed != '':
+                new_filename = new_filename + seed  + '_'
+            else:
+                new_filename = new_filename + "noseed_"
 
-                if 'Model' in parameter:
-                    model = parameter['Model']
-                if 'Seed' in parameter:
-                    seed = parameter['Seed']
+            new_filename = new_filename + get_sanitized_download_time(item_path) + '_'
+            # os.path.splitext(filename)[1]
 
-                if model is not None:
-                    new_filename = model + '_'
-                else:
-                    new_filename = "nomodel_"
+            if 'lora' in str(parameter).lower():
+                Loras = getloras(parameter['Prompt'])
+                if Loras != None:
+                    foundlora = True
+                    print(f"loras: {Loras}")
+                    new_filename = new_filename + 'Loras_' + Loras + '_'
+            else:
+                print("uses no Loras")
 
-                if seed is not None:
-                    new_filename = new_filename + seed  + '_'
-                else:
-                    new_filename = new_filename + "noseed_"
+            new_filename = remove_non_english(new_filename)
+            new_filename = new_filename + os.path.splitext(filename)[1]
+            new_item_path = os.path.join(root, new_filename)
 
-                new_filename = new_filename + get_sanitized_download_time(item_path) + '_'
-                # os.path.splitext(filename)[1]
+            print(new_item_path)
 
-                if 'lora' in str(parameter).lower():
-                    Loras = getloras(parameter['Prompt'])
-                    if Loras != None:
-                        foundlora = True
-                        print(f"loras: {Loras}")
-                        new_filename = new_filename + 'Loras_' + Loras + '_'
-                else:
-                    print("uses no Loras")
-
-                new_filename = new_filename + os.path.splitext(filename)[1]
-                new_item_path = os.path.join(root, new_filename)
-
-                print(new_item_path)
-
-                if item_path not in new_item_path:
-                    try:
-                        shutil.move(item_path, new_item_path)
-                    except Exception as e:
-                        print(str(e))
-                else:
-                    print("doesn't need moving.  Src and dest are the same: " + item_path + ' ' + new_item_path)
+            if item_path not in new_item_path:
+                try:
+                    shutil.move(item_path, new_item_path)
+                except Exception as e:
+                    print(str(e))
+            else:
+                print("doesn't need moving.  Src and dest are the same: " + item_path + ' ' + new_item_path)
 
 
-                print(new_item_path + " has metadata.  Moving to meta subdirectory")
-                move_to_subfolder(new_item_path,"meta")
+            print(new_item_path + " has metadata.  Moving to meta subdirectory")
+            move_to_subfolder(new_item_path,"meta")
