@@ -93,17 +93,20 @@ def get_script_path():
 
 def is_person(snippet):
 
-    for sent in nltk.sent_tokenize(snippet):
-        tokens = nltk.tokenize.word_tokenize(sent)
-        tags = st.tag(tokens)
-        for tag in tags:
-            if tag[1]=='PERSON': 
-                print(f"{tag[0]} is a persons name !!!!!!")
-                return True
-            #elif tag[1]=='ORGANIZATION':
-            #    print(f"{tag} is probably a persons name !!!!!!{tag[1]}")
-            #    return True  
-    return
+    try:
+        for sent in nltk.sent_tokenize(snippet):
+            tokens = nltk.tokenize.word_tokenize(sent)
+            tags = st.tag(tokens)
+            for tag in tags:
+                if tag[1]=='PERSON': 
+                    print(f"{tag[0]} is a persons name !!!!!!")
+                    return True
+                #elif tag[1]=='ORGANIZATION':
+                #    print(f"{tag} is probably a persons name !!!!!!{tag[1]}")
+                #    return True  
+        return
+    except Exception as e:
+        print(f"Error in isperson{e}")
 
 def torch_gc():
     if torch.cuda.is_available():
@@ -365,41 +368,106 @@ def get_description_keywords_tag(filetoproc, istagged=False):
         return res,tagged
     else:
         return res
-    
-def has_duplicates(lst):
-    seen = set()
-    cnt = 0
-    dupes =[]
-    for item in lst:
-        if item in seen:
-            #print(f"DUPE !.  {item} seen before in {lst}")
-            dupes.append(item)
-            cnt += 1
-            #return True
-        seen.add(item)
-    if cnt >0:
-        print(f"{cnt} duplicates in list. {dupes}")
-        return True
-    return False
 
+def fix_person_tag_dict(inputvar):
+
+    islist = False
+    if 'person' in str(inputvar).lower() and 'ISPERSON' not in str(inputvar):
+        print("contains a person record")
+        #if 'people' in str(result2).lower():
+        #    print("people and person in tag")
+        updated_result = []
+
+        if isinstance(inputvar, list):
+            islist = True
+        else:
+            if ';' in inputvar:
+                delim = ';'
+            elif ',' in inputvar:
+                delim = ','
+            else:
+                print("unknown delimiter")
+                return None
+            inputvar = [tag.strip() for tag in re.split('[,;]', str(inputvar))]
+
+        for each in inputvar:
+            if 'people' in each.lower():
+                each = search_replace_case_sensitive('person','People',each)
+            each = each.replace('\\','/')
+            #remove spaces on either side of a forward slash
+            each = re.sub(r'\s*/\s*', '/', each)
+            updated_result.append(each)
+        inputvar = updated_result
+        inputvar = list(set(inputvar))
+
+        if islist == True:
+            return inputvar
+        else:
+            return delim.join(inputvar)
+    else:
+        return inputvar
+  
+def fix_person_tag(inputvar):
+    try:
+        if 'person' in inputvar.lower() and 'ISPERSON' not in inputvar:
+            print(f" {inputvar} contains a person record")
+            #if 'people' in str(result2).lower():
+            #    print("people and person in tag")
+            #if 'people' in inputvar.lower():
+            inputvar = search_replace_case_sensitive('person','People',inputvar)
+
+        inputvar = inputvar.replace('\\','/')
+        inputvar = inputvar.replace('|','/')
+        inputvar = inputvar.replace("'",'')
+        inputvar = inputvar.replace("{",'')
+        inputvar = inputvar.replace("}",'')
+        #remove spaces on either side of a forward slash
+        inputvar = re.sub(r'\s*/\s*', '/', inputvar)
+        #print(f"result is {inputvar}")
+
+        return inputvar
+    except Exception as e:
+        print(f"fix_person_tag {e}")
+
+
+def has_duplicates(lst):
+    try:
+        seen = set()
+        cnt = 0
+        dupes =[]
+        for item in lst:
+            if item in seen:
+                #print(f"DUPE !.  {item} seen before in {lst}")
+                dupes.append(item)
+                cnt += 1
+                #return True
+            seen.add(item)
+        if cnt >0:
+            print(f"{cnt} duplicates in list. {dupes}")
+            return True
+        return False
+    except Exception as e:
+        print(f"has_duplicates {e}")
 def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False,dedupe=False):
     res = {}
     taglist =[]
     taglist.append("IPTC:Keywords")#list
     taglist.append("XMP:TagsList")
-    taglist.append("XMP:Hierarchicalsubject")
-    #taglist.append("XMP:Categories")
-    #taglist.append("XMP:CatalogSets")
+    taglist.append("XMP:HierarchicalSubject")
+    taglist.append("XMP:Categories")
+    taglist.append("XMP:CatalogSets")
     taglist.append("XMP:LastKeywordXMP")
     taglist.append("EXIF:XPKeywords") #string
-    taglist.append("XMP-dc:subject")
+    taglist.append("XMP:Subject")
 
+    mintaglength=3
     tagged = False
     if not markasprocessed:
         taglist.append('XMP:tagged')
 
     if valuetoinsert != None:
         if isinstance(valuetoinsert, list):
+            valuetoinsert = [value.replace("'", "") for value in valuetoinsert]
             keywordlist = valuetoinsert
         else:
             if ',' in valuetoinsert:
@@ -410,140 +478,199 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         keywordlist = None
 
     process = {}
+    for each in taglist:
+        process[each] = 0
+    
     dedupedkeywords = {}
     dupes = False
+
     try:
         with ExifToolHelper() as et:
-            if keywordlist != None:
-                for d in et.get_tags(files=filetoproc, tags=taglist):
-                    if '18983' in str(d):
-                        print("debbug")
-                    for k, v in d.items():
-                        #print(f"Dict: {k} = {v}")
-                        allkeywordsincpotentialdupes = []    
-                        copyofkeywordlist = []
-                        if k != 'SourceFile' and k != 'XMP:Tagged':
-                            #if k == 'IPTC:Keywords' or k == 'XMP:LastKeywordXMP':
-                                if isinstance(v, list):
-                                    for line in v:
-                                        if ',' in str(line) or ';' in str(line):
-                                            tags = [tag.strip() for tag in re.split('[,;]', str(line))]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                                            for one in tags:
-                                                valtoinsert = one.strip()
-                                                if len(valtoinsert)>3:
-                                                    allkeywordsincpotentialdupes.append(valtoinsert)
-                                                    if valtoinsert not in v:
-                                                        copyofkeywordlist.append(valtoinsert)
-                                                        print(f"{valtoinsert} needs adding")
-                                                else:
-                                                    print(f"remove {valtoinsert} as it's too short ")
-                                        elif line not in v:
-                                            valtoinsert = str(line).strip()
-                                            if len(valtoinsert)>3:
-                                                allkeywordsincpotentialdupes.append(valtoinsert)
-                                                copyofkeywordlist.append(valtoinsert)
-                                        elif line in v:
-                                            allkeywordsincpotentialdupes.append(line)
-                                            pass
-                                            #print(f"{line} already in {v}")
-                                        else:
-                                            print("shouldn't get here")
-                                    if len(copyofkeywordlist) >0:
-                                        setb = set(copyofkeywordlist)
-                                        copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > 3 and str(item).strip() not in setb]
-                                        print("Tags ({copyofkeywordlist}) need adding to {k}")
-                                        res[k] = copyofkeywordlist
-
-                                    if has_duplicates(allkeywordsincpotentialdupes):
-                                        dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
-                                        dupes = True
-                                else:
-                                    if ',' in v or ';' in v:
-                                        tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                                        #TODO  not even using tags here !
-                                        for val in valuetoinsert:
-                                                if val not in v and len(val) >3:
-                                                    copyofkeywordlist.append(val)
-                                                    allkeywordsincpotentialdupes.append(val)
-                                        if len(copyofkeywordlist) >0:
-                                            res[k] = ';'.join(copyofkeywordlist)
-                                    else:
-
-                                        #empty value. Populate it
-                                        if len(v) == 0:
-                                            if k != 'EXIF:XPKeywords':
-                                                #They're all lists apart from XPKeywords
-                                                for each in keywordlist:
-                                                    if len(each) >3:
-                                                        copyofkeywordlist.append(each)
-                                                        allkeywordsincpotentialdupes.append(each) 
-                                                res[k] = copyofkeywordlist
-
-                                            else:
-                                                print("this should be EXIF:XPKeywords")
-                                                res[k] = ';'.join(keywordlist)
-                                        else:
-                                            if k != 'EXIF:XPKeywords':
-                                                for each in keywordlist:
-                                                    if len(each) >3:
-                                                        copyofkeywordlist.append(each)
-                                                        allkeywordsincpotentialdupes.append(each) 
-                                                res[k] = copyofkeywordlist
-
-                                            else:
-                                                res[k] = ';'.join(keywordlist)
-
-                                    if has_duplicates(allkeywordsincpotentialdupes):
-                                        dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
-                                        dupes = True
-                        elif k == 'XMP:Tagged':
-                            #print("test")
-                            if v: tagged = True
-
-                        process[k] = len(copyofkeywordlist)
-
-                if dedupe == True and dupes == True:
-                    #deduped = set(allkeywordsincpotentialdupes)
-                    try:
-                        et.set_tags(filetoproc, tags=dedupedkeywords,params=["-P", "-overwrite_original"])
-                        print(f"{et.last_stdout}")
-                    except Exception as e:
-                        print(f"Error {e}")
-                elif dedupe == True and dupes == False:
-                    print("Dupe checking enabled and No dupes found")
-
-                if any(value != 0 for value in process.values()):
-                #if any(value != 0 for value in process):
-                    print(f"needs updating {sum(value for value in process.values())} tags need updating {res}")
-                    if markasprocessed:
-                        res['XMP:tagged'] = "true"
-
-                    try:
-                        et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
-                    except Exception as e:
-                        print(f"Error {e}")
-
-                    print(f"{et.last_stdout}")
-                    return True
-                elif markasprocessed and not tagged:
-                    print(f"Force marked {filetoproc} as tagged due to config")
-                    res['XMP:tagged'] = True
-                    et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
-                    print(f"{et.last_stdout}")
-                    return True
-                else:
-                    print(f"No modifications required to {filetoproc}")
-                
-            else:
-                deletestring = ""
-                for each in taglist:
-                    deletestring = deletestring + f"-{each}= "
-                et.execute(deletestring, filetoproc)
-
-        return True
+            #exiftaglist =  et.get_tags(files=filetoproc,tags=None)
+            exiftaglist =  et.get_tags(files=filetoproc, tags=taglist)
+            test = exiftaglist[0]
+            #print(f"get_tags output: {et.last_stdout}")
     except Exception as e:
-        print(f"Error {e}")
-        return False
+        print(f"Error a {e}")
+    
+    if len(test) <9: #should be 9 returned.  MY 8 and SourceFile
+        print("not enough tags defined in image")
+        for each in taglist:
+            if each not in test and each != 'XMP:tagged':
+                print(f"tag {each} does not exist in metadata for {filetoproc}")
+                if each != 'EXIF:XPKeywords':
+                    res[each] = keywordlist  
+                elif each == 'EXIF:XPKeywords':
+                    res[each] = ';'.join(keywordlist)
+                process[each] += len(keywordlist)
+                
+    if keywordlist != None:
+        for d in exiftaglist:
+            #if '18983' in str(d):
+            #print(f"{str(d)}")
+            #    print("debug")
+            for k, v in d.items():
+                #print(f"Dict: {k} = {v}")
+                allkeywordsincpotentialdupes = []    
+                copyofkeywordlist = []
+                if k != 'SourceFile' and k != 'XMP:Tagged':
+                    if isinstance(v, list):
+                        #print(f"list {k}.  {v}")
+                        for line in v:
+                            if ',' in str(line) or ';' in str(line):
+                                #print("csv {k} line {line} is {v}")
+                                tags = [tag.strip() for tag in re.split('[,;]', str(line))]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                for one in tags:
+                                    valtoinsert = one.strip()
+                                    if len(valtoinsert)>mintaglength:
+                                        allkeywordsincpotentialdupes.append(valtoinsert)
+                                        if valtoinsert not in v:
+                                            valtoinsert = fix_person_tag(valtoinsert)
+                                            copyofkeywordlist.append(valtoinsert)
+                                            print(f"{valtoinsert} needs adding")
+                                    else:
+                                        print(f"remove {valtoinsert} as it's too short ")
+                            elif line not in v:
+                                #print(f"{k}.  {line} line not in {v}")
+                                valtoinsert = str(line).strip()
+                                if len(valtoinsert)>mintaglength:
+                                    valtoinsert = fix_person_tag(valtoinsert)
+                                    allkeywordsincpotentialdupes.append(valtoinsert)
+                                    copyofkeywordlist.append(valtoinsert)
+                            elif line in v:
+                                #print(f"{k}. {line} linein {v}")
+                                line = fix_person_tag(line)
+                                allkeywordsincpotentialdupes.append(line)
+                                #pass
+                                #print(f"{line} already in {v}")
+                            else:
+                                print("shouldn't get here")
+                        #print("p")
+                        if len(copyofkeywordlist) >0:
+                            #print("dedupe")
+                            setb = set(copyofkeywordlist)
+                            copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > mintaglength and str(item).strip() not in setb]
+                            print("Tags ({copyofkeywordlist}) need adding to {k}")
+                            res[k] = copyofkeywordlist
+
+                        #print("q")
+                        if has_duplicates(allkeywordsincpotentialdupes):
+                            print("has dupes")
+                            dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
+                            dupes = True
+                    else:
+                        #print(f"Not a list {k}.. {v}")
+                        if ',' in v or ';' in v:
+                            tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                            #TODO  not even using tags here !
+                            for val in valuetoinsert:
+                                    if val not in v and len(val) >mintaglength:
+                                        val = fix_person_tag(val)
+                                        copyofkeywordlist.append(val)
+                            if len(copyofkeywordlist) >0:
+                                if has_duplicates(copyofkeywordlist):
+                                    copyofkeywordlist = set(copyofkeywordlist)
+                                res[k] = ';'.join(copyofkeywordlist)
+                        else:
+                            #empty value. Populate it
+                            #print("empty")
+                            if len(v) == 0:
+                                if k != 'EXIF:XPKeywords':
+                                    #They're all lists apart from XPKeywords
+                                    for each in keywordlist:
+                                        if len(each) >mintaglength:
+                                            each = fix_person_tag(each)
+                                            copyofkeywordlist.append(each)
+                                            allkeywordsincpotentialdupes.append(each) 
+                                    if has_duplicates(copyofkeywordlist):
+                                        copyofkeywordlist = set(copyofkeywordlist)
+                                    res[k] = copyofkeywordlist
+
+                                else:
+                                    print("this should be EXIF:XPKeywords")
+                                    res[k] = ';'.join(keywordlist)
+                            else:
+                                #print("tt")
+                                if k != 'EXIF:XPKeywords':
+                                    for each in keywordlist:
+                                        #print("each")
+                                        if len(each) >mintaglength:
+                                            each = fix_person_tag(each)
+                                            copyofkeywordlist.append(each)
+                                    if has_duplicates(copyofkeywordlist):
+                                        copyofkeywordlist = set(copyofkeywordlist)
+                                    res[k] = copyofkeywordlist
+                                else:
+                                    #print("datatoupdate")
+                                    datatoupdate = []
+                                    for each in keywordlist:
+                                        datatoupdate.append(fix_person_tag(each))
+                                    keywordlist = datatoupdate
+                                    if has_duplicates(keywordlist):
+                                        keywordlist = set(keywordlist)
+                                    res[k] = ';'.join(keywordlist)
+                        #print("f")
+                        if has_duplicates(allkeywordsincpotentialdupes):
+                            dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
+                            dupes = True
+                    #print("rrr")
+                    #print(f"{k} length of copyofkeywordlist is {len(copyofkeywordlist)}.  type is {type(copyofkeywordlist)}")
+                    try:
+                        process[k] += len(copyofkeywordlist)
+                    except Exception as e:
+                        print(f"exception: {e}")
+                    #print("sss")
+                elif k == 'XMP:Tagged':
+                    #print("test")
+                    if v: tagged = True
+
+        #print("oo")
+
+        if dedupe == True and dupes == True:
+            #deduped = set(allkeywordsincpotentialdupes)
+            #print("Dedupe checking")
+            try:
+                with ExifToolHelper() as et:
+                    et.set_tags(filetoproc, tags=dedupedkeywords,params=["-P", "-overwrite_original"])
+                print(f"dedupe set tag error {et.last_stdout}")
+            except Exception as e:
+                print(f"Error a {e}")
+        elif dedupe == True and dupes == False:
+            print("Dupe checking enabled and No dupes found")
+
+        if any(value != 0 for value in process.values()):
+        #Only modify those with updated tags
+            print(f"needs updating {sum(value for value in process.values())} tags need updating {res}")
+            if markasprocessed:
+                res['XMP:tagged'] = "true"
+            try:
+                with ExifToolHelper() as et:
+                    et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
+                print(f"{et.last_stdout}")
+            except Exception as e:
+                print(f"Error b {e}")
+            return True
+        elif markasprocessed and not tagged:
+            print(f"Force marked {filetoproc} as tagged due to config")
+            res['XMP:tagged'] = True
+            try:
+                with ExifToolHelper() as et:
+                    et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
+                print(f"{et.last_stdout}")
+                return True
+            except Exception as e:
+                print(f"Error c {e}")
+        else:
+            print(f"No modifications required to {filetoproc}")
+        
+    else:
+        deletestring = ""
+        for each in taglist:
+            deletestring = deletestring + f"-{each}= "
+        #et.execute(deletestring, filetoproc)
+
+    return True
+
 
 def blip_large(imagepath,model='small'):
 
@@ -607,7 +734,18 @@ def write_pnginfo(filename,tags):
                 print(f"error {e}")
             os.utime(filename, (original_atime, original_mtime))
             print(f"atime and mtime restored.")
-        
+
+
+def search_replace_case_sensitive(search_pattern, replace_text, input_string):
+    # Perform case-insensitive search
+    matches = re.finditer(search_pattern, input_string, flags=re.IGNORECASE)
+
+    # Iterate through matches and replace in a case-sensitive manner
+    result = input_string
+    for match in matches:
+        result = result[:match.start()] + replace_text + result[match.end():]
+
+    return result       
 
 def modify_exif_comment(filename, tags, command, new_value=None, tagname= None):
     # Check if the file exists
@@ -1235,6 +1373,7 @@ class ImageTextDisplay:
         self.show_current()
 
 CHECK_ISTAGGED= True
+tag_as_processed = False
 gpu = True
 gui = True
 defaultdir = '/folder/to/process'
@@ -1410,9 +1549,11 @@ else:
                             try:
                                 if filename.lower().endswith(('.png')):
                                     write_pnginfo(fullpath, result2)
+                                    apply_description_keywords_tag(fullpath,result2,tag_as_processed,True)
                                 elif filename.lower().endswith(('.jpg')):
                                     #modify_exif_tags(fullpath, result2, 'add',None,tagname)
-                                    apply_description_keywords_tag(fullpath,result2,True,True)
+                                    apply_description_keywords_tag(fullpath,result2,tag_as_processed,True)
+
                             except Exception as e:
                                 print(f"writing tags failed.  {e}")
                         else:
