@@ -23,11 +23,11 @@ def get_script_name():
 def get_script_path():
     return os.path.dirname(os.path.realpath(__file__))
 
-def write_to_log(log_file, message):
+def write_to_log(log_file, message, method='a'):
     global debug
     if debug == True: print(message)
     try:
-        with open(log_file, 'a', encoding='utf-8') as file:
+        with open(log_file, method, encoding='utf-8') as file:
             file.write(message + '\n')
     except Exception as e:
         print(f"Error writing to the log file: {e}.  Press a key to continue")
@@ -157,22 +157,26 @@ def rename_file_grouping(filepath, new_filename):
             properfilename = os.path.splitext(os.path.basename(filename))[0]
             splitbyperiod = os.path.basename(filename).split('.', 1)
             filenamebeforeanyperiods = splitbyperiod[0]
+            if '_' in filenamebeforeanyperiods:
+                filenamebeforeanyperiods = filenamebeforeanyperiods.rsplit('_', 1)[1]
             remainder = splitbyperiod[1]
 
-            result = re.search(r'\d+_\d+_\d+_\d+_(.*)', filenamebeforeanyperiods)
-            if result:
-                originalfilenamebeforeanyperiods = result.group(1)
+            result1 = re.search(r'\d+_\d+_\d+_\d+_(.*)', filenamebeforeanyperiods)
+            if result1:
+                originalfilenamebeforeanyperiods = result1.group(1)
                 #filenamebeforeanyperiods = os.path.normpath(os.path.join(root, desired_part))
                 
-            result = re.search(r'\d+_\d+_(.*)', originalfilenamebeforeanyperiods)
-            if result:
-                originalfilenamebeforeanyperiods = result.group(1)
+            result2 = re.search(r'\d+_\d+_(.*)', originalfilenamebeforeanyperiods)
+            if result2:
+                originalfilenamebeforeanyperiods = result2.group(1)
                 #filenamebeforeanyperiods = os.path.normpath(os.path.join(root, desired_part))
 
-            if originalfilenamebeforeanyperiods in filenamebeforeanyperiods:
+            if originalfilenamebeforeanyperiods == filenamebeforeanyperiods:
                 print("filename matches prefix " + filenamebeforeanyperiods)
                 # Create the new file path by joining the directory and new base filename with the original extension
                 new_filepath = os.path.normpath(os.path.join(root, new_filename + "_" + originalfilenamebeforeanyperiods + "." + remainder))
+
+
 
                 try:
                     # Rename the file
@@ -183,7 +187,8 @@ def rename_file_grouping(filepath, new_filename):
                         os.rename(oldfullpath, new_filepath)
                         print(f"File successfully renamed from '{oldfullpath}' to '{new_filepath}'")
                     else:
-                        print("filename already exists and will not be over written")
+                        print(f"filename already exists and will not be over written.  oldfilename:  {oldfullpath}.  Newfilename {new_filepath}")
+                        print("pause")
                 except FileNotFoundError:
                     print(f"Error: File '{old_filename}' not found.")
                 except Exception as e:
@@ -322,17 +327,24 @@ def main():
                     unique_elements = ['NOTRIGGER']
                 #write_to_log(log_file,f"{fullpath},{unique_elements}")
                     
-                    wrapped_string = f'"{",".join(unique_elements)}"'
+                wrapped_string = f'"{",".join(unique_elements)}"'
 
                 if create_activation == True:
-                    write_to_log(Trigger_file,f"{fullpath},{wrapped_string},{nsfw},{weight}")
+                    #write_to_log(Trigger_file,f"{fullpath},{wrapped_string},{nsfw},{weight}")
+
+                    if unique_elements == ['NOTRIGGER']:
+                        safetensor_trigger_file = os.path.join(root,filename + '_NO_activation_text.txt')                    
+                    else:
+                        safetensor_trigger_file = os.path.join(root,filename + '_activation_text.txt')
+
+                    write_to_log(safetensor_trigger_file,'Activation Text: ' + wrapped_string + f'\nPreferred weight: {weight}\nNFSW: {nsfw}','w')
 
 
 
 root_directory = '/file/to/sort/'
 useapikey = True
-rename_Loras = False
-create_activation = False
+rename_Loras = True
+create_activation = True
 get_checksums = True
 
 if useapikey == True:

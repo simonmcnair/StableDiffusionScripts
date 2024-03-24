@@ -369,44 +369,6 @@ def get_description_keywords_tag(filetoproc, istagged=False):
     else:
         return res
 
-def fix_person_tag_dict(inputvar):
-
-    islist = False
-    if 'person' in str(inputvar).lower() and 'ISPERSON' not in str(inputvar):
-        print("contains a person record")
-        #if 'people' in str(result2).lower():
-        #    print("people and person in tag")
-        updated_result = []
-
-        if isinstance(inputvar, list):
-            islist = True
-        else:
-            if ';' in inputvar:
-                delim = ';'
-            elif ',' in inputvar:
-                delim = ','
-            else:
-                print("unknown delimiter")
-                return None
-            inputvar = [tag.strip() for tag in re.split('[,;]', str(inputvar))]
-
-        for each in inputvar:
-            if 'people' in each.lower():
-                each = search_replace_case_sensitive('person','People',each)
-            each = each.replace('\\','/')
-            #remove spaces on either side of a forward slash
-            each = re.sub(r'\s*/\s*', '/', each)
-            updated_result.append(each)
-        inputvar = updated_result
-        inputvar = list(set(inputvar))
-
-        if islist == True:
-            return inputvar
-        else:
-            return delim.join(inputvar)
-    else:
-        return inputvar
-  
 def fix_person_tag(inputvar):
     try:
         if 'person' in inputvar.lower() and 'ISPERSON' not in inputvar:
@@ -416,20 +378,71 @@ def fix_person_tag(inputvar):
             #if 'people' in inputvar.lower():
             inputvar = search_replace_case_sensitive('person','People',inputvar)
 
-        inputvar = inputvar.replace('\\','/')
-        inputvar = inputvar.replace('|','/')
-        inputvar = inputvar.replace("'",'')
-        inputvar = inputvar.replace("{",'')
-        inputvar = inputvar.replace("}",'')
+        #inputvar = inputvar.replace('/','\\')
+        #inputvar = inputvar.replace('|','\\')
+        #inputvar = inputvar.replace("'",'')
+        #inputvar = inputvar.replace("{",'')
+        #inputvar = inputvar.replace("}",'')
+        #inputvar = inputvar.replace('\\\\','\\')
         #remove spaces on either side of a forward slash
-        inputvar = re.sub(r'\s*/\s*', '/', inputvar)
+        #inputvar = re.sub(r'\s*/\s*', '/', inputvar)
+        #inputvar = re.sub(r'\s*\/\s*', '\\', inputvar)
+
         #print(f"result is {inputvar}")
 
         return inputvar
     except Exception as e:
         print(f"fix_person_tag {e}")
 
+def tidy_tags(lst):
+    for i, item in enumerate(lst):
 
+        if "'" in lst[i] :
+            #print("found '")
+            lst[i] = lst[i].replace("'", "")  # Replace "//" with "\"
+        if '"' in lst[i] :
+            #print('found "')
+            lst[i] = lst[i].replace('"', "")  # Replace "//" with "\"
+
+        if '{' in lst[i] :
+                #print("found {")
+                lst[i] = lst[i].replace("{", "")  # Replace "//" with "\"
+
+        if '}' in lst[i] :
+                #print("found }")
+                lst[i] = lst[i].replace("}", "")  # Replace "//" with "\"
+
+    return lst  # Return the original list if no changes are made
+
+
+def filter_person_from_list(lst):
+    personname = None
+    peoplename = None
+    personindex = None
+    peopleindex = None
+
+    for i, item in enumerate(lst):
+
+        lst[i] = re.sub(r'\s*/\s*', '/', lst[i])
+
+        if '\\' in lst[i]:
+                lst[i] = (lst[i]).replace('\\','/')
+
+        if '//' in lst[i]:
+                 lst[i] = (lst[i]).replace('//','/')
+
+        if 'Person' in lst[i]:
+            lst[i] = lst[i].replace('Person','People')
+            
+        if lst[i].lower() == 'person':
+            lst.pop(i)
+
+        if lst[i].lower() == 'people':
+            lst.pop(i)
+
+    return lst  # Return the original list if no changes are made
+
+    
 def has_duplicates(lst):
     try:
         seen = set()
@@ -448,17 +461,17 @@ def has_duplicates(lst):
         return False
     except Exception as e:
         print(f"has_duplicates {e}")
+
 def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False,dedupe=False):
     res = {}
-    taglist =[]
-    taglist.append("IPTC:Keywords")#list
-    taglist.append("XMP:TagsList")
-    taglist.append("XMP:HierarchicalSubject")
-    taglist.append("XMP:Categories")
-    taglist.append("XMP:CatalogSets")
-    taglist.append("XMP:LastKeywordXMP")
-    taglist.append("EXIF:XPKeywords") #string
-    taglist.append("XMP:Subject")
+    taglist =[  "IPTC:Keywords",#list
+                "XMP:TagsList",
+                "XMP:HierarchicalSubject",
+                "XMP:Categories",
+                "XMP:CatalogSets",
+                "XMP:LastKeywordXMP",
+                "EXIF:XPKeywords", #string
+                "XMP:Subject"]
 
     mintaglength=3
     tagged = False
@@ -525,7 +538,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     if len(valtoinsert)>mintaglength:
                                         allkeywordsincpotentialdupes.append(valtoinsert)
                                         if valtoinsert not in v:
-                                            valtoinsert = fix_person_tag(valtoinsert)
+                                            #valtoinsert = fix_person_tag(valtoinsert)
                                             copyofkeywordlist.append(valtoinsert)
                                             print(f"{valtoinsert} needs adding")
                                     else:
@@ -534,7 +547,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                 #print(f"{k}.  {line} line not in {v}")
                                 valtoinsert = str(line).strip()
                                 if len(valtoinsert)>mintaglength:
-                                    valtoinsert = fix_person_tag(valtoinsert)
+                                    #valtoinsert = fix_person_tag(valtoinsert)
                                     allkeywordsincpotentialdupes.append(valtoinsert)
                                     copyofkeywordlist.append(valtoinsert)
                             elif line in v:
@@ -565,7 +578,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                             #TODO  not even using tags here !
                             for val in valuetoinsert:
                                     if val not in v and len(val) >mintaglength:
-                                        val = fix_person_tag(val)
+                                        #val = fix_person_tag(val)
                                         copyofkeywordlist.append(val)
                             if len(copyofkeywordlist) >0:
                                 if has_duplicates(copyofkeywordlist):
@@ -579,7 +592,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     #They're all lists apart from XPKeywords
                                     for each in keywordlist:
                                         if len(each) >mintaglength:
-                                            each = fix_person_tag(each)
+                                            #each = fix_person_tag(each)
                                             copyofkeywordlist.append(each)
                                             allkeywordsincpotentialdupes.append(each) 
                                     if has_duplicates(copyofkeywordlist):
@@ -595,16 +608,16 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     for each in keywordlist:
                                         #print("each")
                                         if len(each) >mintaglength:
-                                            each = fix_person_tag(each)
+                                            #each = fix_person_tag(each)
                                             copyofkeywordlist.append(each)
-                                    if has_duplicates(copyofkeywordlist):
-                                        copyofkeywordlist = set(copyofkeywordlist)
+
                                     res[k] = copyofkeywordlist
                                 else:
                                     #print("datatoupdate")
                                     datatoupdate = []
                                     for each in keywordlist:
-                                        datatoupdate.append(fix_person_tag(each))
+                                        datatoupdate.append(each)
+                                        #datatoupdate.append(fix_person_tag(each))
                                     keywordlist = datatoupdate
                                     if has_duplicates(keywordlist):
                                         keywordlist = set(keywordlist)
@@ -613,8 +626,6 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         if has_duplicates(allkeywordsincpotentialdupes):
                             dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
                             dupes = True
-                    #print("rrr")
-                    #print(f"{k} length of copyofkeywordlist is {len(copyofkeywordlist)}.  type is {type(copyofkeywordlist)}")
                     try:
                         process[k] += len(copyofkeywordlist)
                     except Exception as e:
@@ -627,14 +638,13 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         #print("oo")
 
         if dedupe == True and dupes == True:
-            #deduped = set(allkeywordsincpotentialdupes)
-            #print("Dedupe checking")
+
             try:
                 with ExifToolHelper() as et:
                     et.set_tags(filetoproc, tags=dedupedkeywords,params=["-P", "-overwrite_original"])
-                print(f"dedupe set tag error {et.last_stdout}")
+                print(f"dedupe set tag result is : {et.last_stdout}")
             except Exception as e:
-                print(f"Error a {e}")
+                print(f"Error deduping: {e}")
         elif dedupe == True and dupes == False:
             print("Dupe checking enabled and No dupes found")
 
@@ -1376,6 +1386,10 @@ CHECK_ISTAGGED= True
 tag_as_processed = False
 gpu = True
 gui = True
+interrogateImage = True
+CheckForPersonsNameInTags = False
+RemovePersonIfPeoplePresent = False
+tidyuptags = True
 defaultdir = '/folder/to/process'
 
 current_os = get_operating_system()
@@ -1470,16 +1484,18 @@ else:
                     #print(f"{fullpath} . {str(result)} . wd-v1-4-convnextv2-tagger-v2")#377MB model.onnx
                     #result = image_to_wd14_tags(fullpath,'wd-v1-4-vit-tagger-v2')
                     #print(f"{fullpath} . {str(result)} . wd-v1-4-vit-tagger-v2")#377MB model.onnx
-                    try:
-                        if gpu == True:
-                            result = use_GPU_interrogation(fullpath)
-                        else:
-                            result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
 
-                        if result == None:
-                            print("nothing returned from interrogation")
-                    except Exception as e:
-                        print(f"interrogation failed.  {e}")
+                    if interrogateImage == True:
+                        try:
+                            if gpu == True:
+                                result = use_GPU_interrogation(fullpath)
+                            else:
+                                result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
+
+                            if result == None:
+                                print("nothing returned from interrogation")
+                        except Exception as e:
+                            print(f"interrogation failed.  {e}")
                          
                     #This gets all the tags currently in the file and creates a deduplicated list
                     mylist =[]
@@ -1520,31 +1536,37 @@ else:
                     #test = nlpconnect(fullpath)
                     #print(f"{fullpath} . {str(test)}")
                     #exit()
-                    isperson = False
-                    if result is not None:
-                        result2 = result[1]
+                    
+                    if result is not None or len(mylist) > 0:
+                        if result is not None:
+                            result2 = result[1]
+                        else:
+                            result2 = []
                         #if len(mylist) > 0:
                         if len(mylist) > 0:
                             result2 = result2 + mylist
 
-                        #mylist = list(set(mylist))
+                        if tidyuptags == True:
+                            result2 = tidy_tags(result2)
+ 
+                        if RemovePersonIfPeoplePresent:
+                            result2 = filter_person_from_list(result2)
+
                         #deduplicate
                         result2 = list(set(filter(None, result2))) #remove duplicates and empty values
                         result2 = [value for value in result2 if len(value) >= 3]  # Remove values under 3 characters in length
 
+                        test = ' '.join(result2)
 
-                        test = ' '.join(result2).replace('/',' ').replace("\\",' ')
-                        if is_person(test):
-                            #print(f" means it's is_person")
-                            isperson = True
-                            result2.append("ISPERSON")
-                        #for res in test:
-                        #    if is_person(res):
-                        #        res.append(f" {res} means it's is_person")
+                        if CheckForPersonsNameInTags == True:
+                            isperson = False
+                            if is_person(test):
+                                isperson = True
+                                result2.append("ISPERSON")
 
                         if len(result2) > 0:
                             #print(str(result2))
-                            tagname = 'XPKeywords'
+                            #tagname = 'XPKeywords'
                             #tagname = 'EXIF:XPKeywords'
                             try:
                                 if filename.lower().endswith(('.png')):
