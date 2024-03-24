@@ -30,6 +30,7 @@ from huggingface_hub import hf_hub_download
 from onnxruntime import InferenceSession
 
 from exiftool import ExifToolHelper
+#pip install pyexiftool
 
 #importing libraries
 import os
@@ -41,6 +42,7 @@ from PIL.ExifTags import TAGS
 from PIL import Image, ImageTk
 #below for pngs
 from PIL import PngImagePlugin, Image
+#.\venv\Scripts\pip.exe install pillow
 #pip install piexif
 #import piexif
 #import piexif.helper
@@ -430,6 +432,9 @@ def filter_person_from_list(lst):
 
         if '//' in lst[i]:
                  lst[i] = (lst[i]).replace('//','/')
+
+        if '|' in lst[i]:
+                 lst[i] = (lst[i]).replace('|','/')
 
         if 'Person' in lst[i]:
             lst[i] = lst[i].replace('Person','People')
@@ -1388,7 +1393,7 @@ gpu = True
 gui = True
 interrogateImage = True
 CheckForPersonsNameInTags = False
-RemovePersonIfPeoplePresent = False
+RemovePersonIfPeoplePresent = True
 tidyuptags = True
 defaultdir = '/folder/to/process'
 
@@ -1411,7 +1416,8 @@ else:
     print("local override file would be " + localoverridesfile)
 
 RE_SPECIAL = re.compile(r'([\\()])')
-st = StanfordNERTagger (get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', get_script_path() + '/stanford-ner/stanford-ner.jar')
+if CheckForPersonsNameInTags:
+    st = StanfordNERTagger (get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', get_script_path() + '/stanford-ner/stanford-ner.jar')
 ci = None
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,expandable_segments:True"
 
