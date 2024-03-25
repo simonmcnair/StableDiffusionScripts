@@ -51,7 +51,7 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
     re_param_code = r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)'
     re_param = re.compile(re_param_code)
     re_imagesize = re.compile(r"^(\d+)x(\d+)$")
-    re_hypernet_hash = re.compile("\(([0-9a-f]+)\)$")
+    re_hypernet_hash = re.compile(r"\(([0-9a-f]+)\)$")
     if 'Template' in x:
         print("has template")
 
@@ -171,14 +171,41 @@ def get_sanitized_download_time(filepath):
     # Return the sanitized datetime string
     return sanitized_dt_string
 
+def trim_filepath(filepath):
+    # Get the maximum length allowed for a path on Windows
+    max_path_length = 260
+
+    # Get the length of the root directory (e.g., C:\)
+    root_length = len(os.path.splitdrive(filepath)[0]) + 2  # Add 2 for the drive letter and colon
+
+    # If the path is already within the limit, return it as is
+    if len(filepath) <= max_path_length:
+        return filepath
+
+    # Calculate the maximum length for the remaining part of the path
+    max_remaining_length = max_path_length - root_length
+
+    # Trim the remaining part of the path if it exceeds the maximum length
+    remaining_path = os.path.splitdrive(filepath)[1]
+    if len(remaining_path) > max_remaining_length:
+        # If the path is longer than the maximum length, keep the basename and truncate the rest
+        basename = os.path.basename(filepath)
+        remaining_length = max_remaining_length - len(basename)
+        dir_path = os.path.dirname(filepath)
+        trimmed_path = os.path.join(dir_path[:remaining_length], basename)
+        return trimmed_path
+    else:
+        return filepath
+    
 def remove_non_english(text):
     # Define a regular expression pattern to match English letters and spaces
-    english_pattern = re.compile("[^a-zA-Z0-9\s!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~]")
+    #english_pattern = re.compile("[^a-zA-Z0-9\s!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~]")
+    english_pattern = re.compile(r"[^a-zA-Z0-9\s!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~]")
 
     # Use the sub() method to replace non-English characters with an empty string
     cleaned_text = english_pattern.sub("", text)
 
-    return cleaned_text
+    return trim_filepath(cleaned_text)
 
 def has_parameters(filepath, verify="false"):
 
