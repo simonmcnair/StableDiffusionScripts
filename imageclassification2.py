@@ -355,32 +355,31 @@ def get_description_keywords_tag(filetoproc, istagged=False):
     if istagged:
         taglist.append('XMP:tagged')
     try:
-        with ExifToolHelper() as et:
-                for d in et.get_tags(files=filetoproc, tags=taglist):
-                    for k, v in d.items():
-                        #logger.info(f"Dict: {k} = {v}")
-                        if k != 'SourceFile' and k != 'XMP:Tagged':
-                                #logger.info(k)
-                                if isinstance(v, list):
-                                    for line in v:
-                                            keywordlist.append(str(line).strip())
-                                    res[k] = keywordlist
+            for d in et.get_tags(files=filetoproc, tags=taglist):
+                for k, v in d.items():
+                    #logger.info(f"Dict: {k} = {v}")
+                    if k != 'SourceFile' and k != 'XMP:Tagged':
+                            #logger.info(k)
+                            if isinstance(v, list):
+                                for line in v:
+                                        keywordlist.append(str(line).strip())
+                                res[k] = keywordlist
+                            else:
+                                if ',' in v or ';' in v:
+                                    # If either a comma or semicolon is present in the value
+                                    tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                    res[k] = ';'.join(tags)  # Join the list elements using semicolon as the separator and assign to the key k in the dictionary res
                                 else:
-                                    if ',' in v or ';' in v:
-                                        # If either a comma or semicolon is present in the value
-                                        tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                                        res[k] = ';'.join(tags)  # Join the list elements using semicolon as the separator and assign to the key k in the dictionary res
-                                    else:
-                                        res[k] = v
-                                #logger.info("test")
-                        elif k == 'XMP:Tagged':
+                                    res[k] = v
                             #logger.info("test")
-                            if v: tagged = True
+                    elif k == 'XMP:Tagged':
+                        #logger.info("test")
+                        if v: tagged = True
 
-                for key, value in res.items():
-                    if isinstance(value, list):
-                        res[key] = list(set(value))
-                if len(res) == 0: res = False
+            for key, value in res.items():
+                if isinstance(value, list):
+                    res[key] = list(set(value))
+            if len(res) == 0: res = False
     except Exception as e:
         logger.error(f"Error {e}")
         res = False
@@ -528,11 +527,10 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     dupes = False
 
     try:
-        with ExifToolHelper() as et:
-            #exiftaglist =  et.get_tags(files=filetoproc,tags=None)
-            exiftaglist =  et.get_tags(files=filetoproc, tags=taglist)
-            test = exiftaglist[0]
-            #logger.info(f"get_tags output: {et.last_stdout}")
+        #exiftaglist =  et.get_tags(files=filetoproc,tags=None)
+        exiftaglist =  et.get_tags(files=filetoproc, tags=taglist)
+        test = exiftaglist[0]
+        #logger.info(f"get_tags output: {et.last_stdout}")
     except Exception as e:
         logger.error(f"Error a {e}")
     
@@ -670,8 +668,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         if dedupe == True and dupes == True:
 
             try:
-                with ExifToolHelper() as et:
-                    et.set_tags(filetoproc, tags=dedupedkeywords,params=["-P", "-overwrite_original"])
+#                with ExifToolHelper() as et:
+                et.set_tags(filetoproc, tags=dedupedkeywords,params=["-P", "-overwrite_original"])
                 logger.info(f"dedupe set tag result is : {et.last_stdout}")
             except Exception as e:
                 logger.error(f"Error deduping: {e}")
@@ -684,8 +682,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
             if markasprocessed:
                 res['XMP:tagged'] = "true"
             try:
-                with ExifToolHelper() as et:
-                    et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
+                #with ExifToolHelper() as et:
+                et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
                 logger.info(f"{et.last_stdout}")
             except Exception as e:
                 logger.error(f"Error b {e}")
@@ -694,8 +692,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
             logger.info(f"Force marked {filetoproc} as tagged due to config")
             res['XMP:tagged'] = True
             try:
-                with ExifToolHelper() as et:
-                    et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
+                #with ExifToolHelper() as et:
+                et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
                 logger.info(f"{et.last_stdout}")
                 return True
             except Exception as e:
@@ -1441,8 +1439,17 @@ logger = utils.setup_logging(log_file_path, errorlog_file_path, log_level='warni
 
 if current_os == "Windows":
     logger.info("Running on Windows")
+
+    import psutil
+    # Set process priority to below normal
+    p = psutil.Process()
+    p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+
 elif current_os == "Linux":
     logger.info("Running on Linux")
+    current_niceness = os.nice(0)
+    print("Current niceness value:", current_niceness)
+    os.nice(-10)
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
@@ -1458,6 +1465,11 @@ if CheckForPersonsNameInTags:
     st = StanfordNERTagger (get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', get_script_path() + '/stanford-ner/stanford-ner.jar')
 ci = None
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,expandable_segments:True"
+
+et = ExifToolHelper()
+# Start ExifTool process
+et.start()
+
 
 model_loaded = False
 if gui == True:
@@ -1631,3 +1643,5 @@ else:
                 logger.info(f"{fullpath} - Processing complete")
             else:
                 logger.info(f"{fullpath} - Unsupported filetype.  Not an image.")
+
+et.terminate()
