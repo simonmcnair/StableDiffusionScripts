@@ -498,7 +498,7 @@ def has_duplicates(lst):
             return True
         return False
     except Exception as e:
-        logger.error(f"has_duplicates {e}")
+        logger.error(f"has_duplicates error : {e}")
 
 @timing_decorator
 def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False,dedupe=False):
@@ -605,10 +605,10 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                             res[k] = copyofkeywordlist
 
                         #logger.info("q")
-                        if has_duplicates(allkeywordsincpotentialdupes):
-                            logger.info("has dupes")
-                            dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
-                            dupes = True
+                        #if has_duplicates(allkeywordsincpotentialdupes):
+                        #    logger.info("has dupes")
+                        #    dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
+                        #    dupes = True
                     else:
                         #logger.info(f"Not a list {k}.. {v}")
                         if ',' in v or ';' in v:
@@ -619,8 +619,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                         #val = fix_person_tag(val)
                                         copyofkeywordlist.append(val)
                             if len(copyofkeywordlist) >0:
-                                if has_duplicates(copyofkeywordlist):
-                                    copyofkeywordlist = set(copyofkeywordlist)
+                                #if has_duplicates(copyofkeywordlist):
+                                #    copyofkeywordlist = set(copyofkeywordlist)
                                 res[k] = ';'.join(copyofkeywordlist)
                         else:
                             #empty value. Populate it
@@ -633,8 +633,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                             #each = fix_person_tag(each)
                                             copyofkeywordlist.append(each)
                                             allkeywordsincpotentialdupes.append(each) 
-                                    if has_duplicates(copyofkeywordlist):
-                                        copyofkeywordlist = set(copyofkeywordlist)
+                                    #if has_duplicates(copyofkeywordlist):
+                                    #copyofkeywordlist = set(copyofkeywordlist)
                                     res[k] = copyofkeywordlist
 
                                 else:
@@ -657,17 +657,20 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                         datatoupdate.append(each)
                                         #datatoupdate.append(fix_person_tag(each))
                                     keywordlist = datatoupdate
-                                    if has_duplicates(keywordlist):
-                                        keywordlist = set(keywordlist)
+                                    #if has_duplicates(keywordlist):
+                                    #keywordlist = set(keywordlist)
                                     res[k] = ';'.join(keywordlist)
-                        #logger.info("f")
+                    #logger.info("f")
+                    try:
                         if has_duplicates(allkeywordsincpotentialdupes):
                             dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
                             dupes = True
+                    except Exception as e:
+                        logger.error(f"has dupes exception: {e}")
                     try:
                         process[k] += len(copyofkeywordlist)
                     except Exception as e:
-                        logger.error(f"exception: {e}")
+                        logger.error(f"add to array exception: {e}")
                     #logger.info("sss")
                 elif k == 'XMP:Tagged':
                     #logger.info("test")
