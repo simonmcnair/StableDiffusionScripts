@@ -1449,7 +1449,7 @@ elif current_os == "Linux":
     logger.info("Running on Linux")
     current_niceness = os.nice(0)
     print("Current niceness value:", current_niceness)
-    os.nice(-10)
+    #os.nice(-10)
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
