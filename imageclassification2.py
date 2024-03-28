@@ -1468,8 +1468,6 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,expandable_segme
 
 et = ExifToolHelper()
 # Start ExifTool process
-et.start()
-
 
 model_loaded = False
 if gui == True:
