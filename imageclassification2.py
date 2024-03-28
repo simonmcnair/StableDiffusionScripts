@@ -81,9 +81,10 @@ nltk.download('punkt')
 
 def timing_decorator(func):
     global timing_debug
-    if timing_debug == False:
-        return
+
     def wrapper(*args, **kwargs):
+        if timing_debug == False:
+            return
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
