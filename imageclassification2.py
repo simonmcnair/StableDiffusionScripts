@@ -80,6 +80,8 @@ nltk.download('punkt')
 ##rm -rf stanford-ner-2014-08-27 stanford-ner-2014-08-27.zip
 
 def timing_decorator(func):
+    if timing_debug == False:
+        return
     def wrapper(*args, **kwargs):
         start_time = time.time()
         result = func(*args, **kwargs)
@@ -393,12 +395,18 @@ def get_description_keywords_tag(filetoproc, istagged=False):
 @timing_decorator
 def fix_person_tag(inputvar):
     try:
-        if 'person' in inputvar.lower() and 'ISPERSON' not in inputvar:
+        if 'person' in str(inputvar.lower()) and 'people' not in str(inputvar.lower()):
             logger.info(f" {inputvar} contains a person record")
             #if 'people' in str(result2).lower():
             #    logger.info("people and person in tag")
             #if 'people' in inputvar.lower():
-            inputvar = search_replace_case_sensitive('person','People',inputvar)
+            #inputvar = search_replace_case_insensitive('person','People',inputvar)
+
+            matches = re.finditer('person', inputvar, flags=re.IGNORECASE)
+
+            # Iterate through matches and replace in a case-sensitive manner
+            for match in matches:
+                inputvar = inputvar[:match.start()] + 'People' + inputvar[match.end():]
 
         #inputvar = inputvar.replace('/','\\')
         #inputvar = inputvar.replace('|','\\')
@@ -580,7 +588,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     copyofkeywordlist.append(valtoinsert)
                             elif line in v:
                                 #logger.info(f"{k}. {line} linein {v}")
-                                line = fix_person_tag(line)
+                                #line = fix_person_tag(line)
                                 allkeywordsincpotentialdupes.append(line)
                                 #pass
                                 #logger.info(f"{line} already in {v}")
@@ -777,7 +785,7 @@ def write_pnginfo(filename,tags):
 
 
 @timing_decorator
-def search_replace_case_sensitive(search_pattern, replace_text, input_string):
+def search_replace_case_insensitive(search_pattern, replace_text, input_string):
     # Perform case-insensitive search
     matches = re.finditer(search_pattern, input_string, flags=re.IGNORECASE)
 
@@ -1427,6 +1435,7 @@ interrogateImage = True
 CheckForPersonsNameInTags = False
 RemovePersonIfPeoplePresent = True
 tidyuptags = True
+timing_debug = True
 defaultdir = '/folder/to/process'
 
 current_os = get_operating_system()
