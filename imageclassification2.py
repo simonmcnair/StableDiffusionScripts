@@ -548,43 +548,38 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                 copyofkeywordlist = []
                 if k != 'SourceFile' and k != 'XMP:Tagged':
                     if isinstance(v, list):
-                        #logger.info(f"list {k}.  {v}")
+                        logger.info(f"list {k}.  {v}")
                         for line in v:
                             if ',' in str(line) or ';' in str(line):
-                                #logger.info("csv {k} line {line} is {v}")
+                                logger.info("List with ; or '. csv {k} line {line} is {v}")
                                 tags = [tag.strip() for tag in re.split('[,;]', str(line))]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                                for one in tags:
-                                    valtoinsert = one.strip()
-                                    if len(valtoinsert)>mintaglength:
-                                        allkeywordsincpotentialdupes.append(valtoinsert)
-                                        if valtoinsert not in v:
-                                            #valtoinsert = fix_person_tag(valtoinsert)
-                                            copyofkeywordlist.append(valtoinsert)
-                                            logger.info(f"{valtoinsert} needs adding")
-                                    else:
-                                        logger.info(f"remove {valtoinsert} as it's too short ")
+                                for each in tags:
+                                    allkeywordsincpotentialdupes.append(each)
+                                    if each not in v:
+                                        #valtoinsert = fix_person_tag(each)
+                                        copyofkeywordlist.append(each)
+                                        logger.info(f"{each} needs adding")
                             elif line not in v:
-                                #logger.info(f"{k}.  {line} line not in {v}")
-                                valtoinsert = str(line).strip()
-                                if len(valtoinsert)>mintaglength:
-                                    #valtoinsert = fix_person_tag(valtoinsert)
-                                    allkeywordsincpotentialdupes.append(valtoinsert)
-                                    copyofkeywordlist.append(valtoinsert)
+                                logger.info(f"List. {k}.  {line} line not in {v}")
+                                #valtoinsert = fix_person_tag(line)
+                                allkeywordsincpotentialdupes.append(line)
+                                copyofkeywordlist.append(line)
                             elif line in v:
                                 #logger.info(f"{k}. {line} linein {v}")
                                 #line = fix_person_tag(line)
+                                #line = line.strip()
                                 allkeywordsincpotentialdupes.append(line)
                                 #pass
                                 #logger.info(f"{line} already in {v}")
                             else:
                                 logger.info("shouldn't get here")
                         #logger.info("p")
-                        if len(copyofkeywordlist) >0:
+                        #if len(copyofkeywordlist) >0:
                             #logger.info("dedupe")
-                            setb = set(copyofkeywordlist)
-                            copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > mintaglength and str(item).strip() not in setb]
-                            logger.info("Tags ({copyofkeywordlist}) need adding to {k}")
-                            res[k] = copyofkeywordlist
+                        #    setb = set(copyofkeywordlist)
+                        #    copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > mintaglength and str(item).strip() not in setb]
+                        #    logger.info("Tags ({copyofkeywordlist}) need adding to {k}")
+                        #    res[k] = copyofkeywordlist
 
                         #logger.info("q")
                         #if has_duplicates(allkeywordsincpotentialdupes):
@@ -593,17 +588,19 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         #    dupes = True
                     else:
                         #logger.info(f"Not a list {k}.. {v}")
+                        logger.info(f"{v} is a string")
                         if ',' in v or ';' in v:
+                            logger.info(f"NOT a List. {k}.  {v} needs splitting")
                             tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
                             #TODO  not even using tags here !
                             for val in valuetoinsert:
-                                    if val not in v and len(val) >mintaglength:
+                                    #if val not in v and len(val) >mintaglength:
                                         #val = fix_person_tag(val)
-                                        copyofkeywordlist.append(val)
-                            if len(copyofkeywordlist) >0:
+                                    copyofkeywordlist.append(val)
+                            #if len(copyofkeywordlist) >0:
                                 #if has_duplicates(copyofkeywordlist):
                                 #    copyofkeywordlist = set(copyofkeywordlist)
-                                res[k] = ';'.join(copyofkeywordlist)
+                                #res[k] = ';'.join(copyofkeywordlist)
                         else:
                             #empty value. Populate it
                             #logger.info("empty")
@@ -611,27 +608,29 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                 if k != 'EXIF:XPKeywords':
                                     #They're all lists apart from XPKeywords
                                     for each in keywordlist:
-                                        if len(each) >mintaglength:
+                                        #if len(each) >mintaglength:
                                             #each = fix_person_tag(each)
-                                            copyofkeywordlist.append(each)
-                                            allkeywordsincpotentialdupes.append(each) 
+                                        copyofkeywordlist.append(each)
+                                        allkeywordsincpotentialdupes.append(each) 
                                     #if has_duplicates(copyofkeywordlist):
                                     #copyofkeywordlist = set(copyofkeywordlist)
-                                    res[k] = copyofkeywordlist
+                                    #res[k] = copyofkeywordlist
 
                                 else:
                                     logger.info("this should be EXIF:XPKeywords")
-                                    res[k] = ';'.join(keywordlist)
+                                    #res[k] = ';'.join(keywordlist)
                             else:
                                 #logger.info("tt")
                                 if k != 'EXIF:XPKeywords':
-                                    for each in keywordlist:
-                                        #logger.info("each")
-                                        if len(each) >mintaglength:
-                                            #each = fix_person_tag(each)
-                                            copyofkeywordlist.append(each)
+                                    copyofkeywordlist = [x for x in keywordlist]
 
-                                    res[k] = copyofkeywordlist
+                                    #for each in keywordlist:
+                                        #logger.info("each")
+                                        #if len(each) >mintaglength:
+                                            #each = fix_person_tag(each)
+                                        #copyofkeywordlist.append(each)
+
+                                    #res[k] = copyofkeywordlist
                                 else:
                                     #logger.info("datatoupdate")
                                     datatoupdate = []
@@ -641,18 +640,34 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     keywordlist = datatoupdate
                                     #if has_duplicates(keywordlist):
                                     #keywordlist = set(keywordlist)
-                                    res[k] = ';'.join(keywordlist)
+                                    #res[k] = ';'.join(keywordlist)
+
+                        #dedupe
+                        setb = set(copyofkeywordlist)
+                        #strip mintaglength
+                        copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > mintaglength and str(item).strip() not in setb]
+                        logger.info(f"Tags ({copyofkeywordlist}) need adding to {k}")
+
                     #logger.info("f")
-                    try:
-                        if has_duplicates(allkeywordsincpotentialdupes):
-                            dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
-                            dupes = True
-                    except Exception as e:
-                        logger.error(f"has dupes exception: {e}")
+                        try:
+                            if has_duplicates(allkeywordsincpotentialdupes):
+                                dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
+                                dupes = True
+                        except Exception as e:
+                            logger.error(f"has dupes exception: {e}")
+
                     try:
                         process[k] += len(copyofkeywordlist)
                     except Exception as e:
                         logger.error(f"add to array exception: {e}")
+
+                    if len(copyofkeywordlist) >0 and (',' in v or ';' in v):
+                        #if has_duplicates(copyofkeywordlist):
+                        #    copyofkeywordlist = set(copyofkeywordlist)
+                        res[k] = ';'.join(copyofkeywordlist)
+                    else:
+                        res[k] = copyofkeywordlist
+
                     #logger.info("sss")
                 elif k == 'XMP:Tagged':
                     #logger.info("test")
