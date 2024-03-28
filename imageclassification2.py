@@ -428,25 +428,7 @@ def fix_person_tag(inputvar):
 
 @timing_decorator
 def tidy_tags(lst):
-    for i, item in enumerate(lst):
-
-        if "'" in lst[i] :
-            #logger.info("found '")
-            lst[i] = lst[i].replace("'", "")  # Replace "//" with "\"
-        if '"' in lst[i] :
-            #logger.info('found "')
-            lst[i] = lst[i].replace('"', "")  # Replace "//" with "\"
-
-        if '{' in lst[i] :
-                #logger.info("found {")
-                lst[i] = lst[i].replace("{", "")  # Replace "//" with "\"
-
-        if '}' in lst[i] :
-                #logger.info("found }")
-                lst[i] = lst[i].replace("}", "")  # Replace "//" with "\"
-
-    return lst  # Return the original list if no changes are made
-
+    return [item.replace("'", "").replace('"', "").replace("{", "").replace("}", "") for item in lst]
 
 @timing_decorator
 def filter_person_from_list(lst):
