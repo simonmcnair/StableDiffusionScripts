@@ -539,11 +539,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                 
     if keywordlist != None:
         for d in exiftaglist:
-            #if '18983' in str(d):
-            #logger.info(f"{str(d)}")
-            #    logger.info("debug")
             for k, v in d.items():
-                #logger.info(f"Dict: {k} = {v}")
+                logger.info(f"Dict: {k} = {v}")
                 allkeywordsincpotentialdupes = []    
                 copyofkeywordlist = []
                 if k != 'SourceFile' and k != 'XMP:Tagged':
@@ -565,62 +562,34 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                 allkeywordsincpotentialdupes.append(line)
                                 copyofkeywordlist.append(line)
                             elif line in v:
-                                #logger.info(f"{k}. {line} linein {v}")
                                 #line = fix_person_tag(line)
-                                #line = line.strip()
                                 allkeywordsincpotentialdupes.append(line)
-                                #pass
-                                #logger.info(f"{line} already in {v}")
+                                logger.info(f"{line} already in {v}")
                             else:
-                                logger.info("shouldn't get here")
-                        #logger.info("p")
-                        #if len(copyofkeywordlist) >0:
-                            #logger.info("dedupe")
-                        #    setb = set(copyofkeywordlist)
-                        #    copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > mintaglength and str(item).strip() not in setb]
-                        #    logger.info("Tags ({copyofkeywordlist}) need adding to {k}")
-                        #    res[k] = copyofkeywordlist
-
-                        #logger.info("q")
-                        #if has_duplicates(allkeywordsincpotentialdupes):
-                        #    logger.info("has dupes")
-                        #    dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
-                        #    dupes = True
+                                logger.info("shouldn't get here.  wait and see why")
+                                input()
                     else:
-                        #logger.info(f"Not a list {k}.. {v}")
-                        logger.info(f"{v} is a string")
+                        logger.info(f"Not a list:{type(v)} {k}.. {v}")
                         if ',' in v or ';' in v:
                             logger.info(f"NOT a List. {k}.  {v} needs splitting")
                             tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
                             #TODO  not even using tags here !
                             for val in valuetoinsert:
-                                    #if val not in v and len(val) >mintaglength:
-                                        #val = fix_person_tag(val)
+                                    #val = fix_person_tag(val)
                                     copyofkeywordlist.append(val)
-                            #if len(copyofkeywordlist) >0:
-                                #if has_duplicates(copyofkeywordlist):
-                                #    copyofkeywordlist = set(copyofkeywordlist)
-                                #res[k] = ';'.join(copyofkeywordlist)
                         else:
                             #empty value. Populate it
-                            #logger.info("empty")
+                            logger.info("empty value.  Populate it")
                             if len(v) == 0:
-                                if k != 'EXIF:XPKeywords':
+                                if k != 'EXIF:XPKeywords.  Len v is zero so is not a list':
                                     #They're all lists apart from XPKeywords
                                     for each in keywordlist:
-                                        #if len(each) >mintaglength:
-                                            #each = fix_person_tag(each)
                                         copyofkeywordlist.append(each)
                                         allkeywordsincpotentialdupes.append(each) 
-                                    #if has_duplicates(copyofkeywordlist):
-                                    #copyofkeywordlist = set(copyofkeywordlist)
-                                    #res[k] = copyofkeywordlist
-
                                 else:
                                     logger.info("this should be EXIF:XPKeywords")
-                                    #res[k] = ';'.join(keywordlist)
                             else:
-                                #logger.info("tt")
+                                logger.info("tt")
                                 if k != 'EXIF:XPKeywords':
                                     copyofkeywordlist = [x for x in keywordlist]
 
@@ -633,11 +602,13 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     #res[k] = copyofkeywordlist
                                 else:
                                     #logger.info("datatoupdate")
-                                    datatoupdate = []
-                                    for each in keywordlist:
-                                        datatoupdate.append(each)
+                                    #datatoupdate = []
+                                    #for each in keywordlist:
+                                        copyofkeywordlist.append(each)
+                                        print(f"Not sure when this is called,so wait for a keypress. I think it's EXIF:XPKeywords. {k}. {v}")
+                                        input()
                                         #datatoupdate.append(fix_person_tag(each))
-                                    keywordlist = datatoupdate
+                                    #keywordlist = datatoupdate
                                     #if has_duplicates(keywordlist):
                                     #keywordlist = set(keywordlist)
                                     #res[k] = ';'.join(keywordlist)
@@ -646,6 +617,9 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         setb = set(copyofkeywordlist)
                         #strip mintaglength
                         copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > mintaglength and str(item).strip() not in setb]
+                        #if fix person tag
+                        #[fix_person_tag(item) for item in copyofkeywordlist]
+
                         logger.info(f"Tags ({copyofkeywordlist}) need adding to {k}")
 
                     #logger.info("f")
