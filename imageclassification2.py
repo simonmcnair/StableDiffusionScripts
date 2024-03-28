@@ -80,6 +80,7 @@ nltk.download('punkt')
 ##rm -rf stanford-ner-2014-08-27 stanford-ner-2014-08-27.zip
 
 def timing_decorator(func):
+    global timing_debug
     if timing_debug == False:
         return
     def wrapper(*args, **kwargs):
