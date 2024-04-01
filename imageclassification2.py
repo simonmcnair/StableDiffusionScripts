@@ -371,8 +371,8 @@ def get_description_keywords_tag(filetoproc, istagged=False):
                             else:
                                 if ',' in v or ';' in v:
                                     # If either a comma or semicolon is present in the value
-                                    tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                                    res[k] = ';'.join(tags)  # Join the list elements using semicolon as the separator and assign to the key k in the dictionary res
+                                    res[k] = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                    #res[k] = ';'.join(tags)  # Join the list elements using semicolon as the separator and assign to the key k in the dictionary res
                                 else:
                                     res[k] = v
                             #logger.info("test")
@@ -461,7 +461,32 @@ def filter_person_from_list(lst):
 
     return lst  # Return the original list if no changes are made
 
-    
+def set_union(set1, set2):
+    #Union: Returns a new set containing all the distinct elements present in both sets.
+    return set1.union(set2)
+
+def set_difference(set1, set2):
+    #Difference: Returns a new set containing elements that are present in the first set but not in the second set.
+    return set1.difference(set2)
+
+def is_subset(set1, set2):
+    #Subset : if a set is a subset of another set.
+    return set2.issubset(set1)
+
+def is_superset(set1, set2):
+    #Superset: if a set is a superset of another set.
+    return set1.issuperset(set2)
+
+def is_disjoint(set1, set2):
+    #Disjoint: Checks if two sets have no common elements.
+    return set1.isdisjoint(set2)
+
+def symmetric_difference_update(set1, set2):
+    #Updates the set with the symmetric difference of itself and another set.
+    set1.symmetric_difference_update(set2)
+    return set1
+
+
 @timing_decorator
 def has_duplicates(lst):
     try:
@@ -486,16 +511,23 @@ def has_duplicates(lst):
 def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False,dedupe=False):
     res = {}
     taglist =[  "IPTC:Keywords",#list
-                "XMP:TagsList",
-                "XMP:HierarchicalSubject",
-                "XMP:Categories",
-                "XMP:CatalogSets",
-                "XMP:LastKeywordXMP",
+                "XMP:TagsList",#list
+                "XMP:HierarchicalSubject",#list
+                "XMP:Categories",#string
+                "XMP:CatalogSets",#list
+                "XMP:LastKeywordXMP",#list
                 "EXIF:XPKeywords", #string
-                "XMP:Subject"]
+                "XMP:Subject"]#list
 
+    stringlist =[  
+                "XMP:Categories",#string
+                "EXIF:XPKeywords", #string
+                ]
     mintaglength=3
     tagged = False
+    forcetag = False
+    forcewrite = False
+
     if not markasprocessed:
         taglist.append('XMP:tagged')
 
@@ -503,6 +535,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         if isinstance(valuetoinsert, list):
             valuetoinsert = [value.replace("'", "") for value in valuetoinsert]
             keywordlist = valuetoinsert
+            split_string_set = set(keywordlist)
         else:
             if ',' in valuetoinsert:
                 keywordlist = valuetoinsert.split(',')
@@ -515,9 +548,6 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     for each in taglist:
         process[each] = 0
     
-    dedupedkeywords = {}
-    dupes = False
-
     try:
         #exiftaglist =  et.get_tags(files=filetoproc,tags=None)
         exiftaglist =  et.get_tags(files=filetoproc, tags=taglist)
@@ -531,134 +561,134 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         for each in taglist:
             if each not in test and each != 'XMP:tagged':
                 logger.info(f"tag {each} does not exist in metadata for {filetoproc}")
-                if each != 'EXIF:XPKeywords':
-                    res[each] = keywordlist  
-                elif each == 'EXIF:XPKeywords':
-                    res[each] = ';'.join(keywordlist)
-                process[each] += len(keywordlist)
+                res[each] = set([value for value in valuetoinsert if value])  
+                process[each] += len(res[each])
                 
     if keywordlist != None:
         for d in exiftaglist:
             for k, v in d.items():
-                logger.info(f"Dict: {k} = {v}")
+                logger.info(f"{type(v)}: {k} = {v}")
                 allkeywordsincpotentialdupes = []    
                 copyofkeywordlist = []
-                if k != 'SourceFile' and k != 'XMP:Tagged':
-                    if isinstance(v, list):
-                        logger.info(f"list {k}.  {v}")
+                if k != 'SourceFile' and k != 'XMP:Tagged':                 
+                    if isinstance(v, list) or isinstance(v, dict):
+                        logger.info(f"{type(v)}.  {k}.  {v}")
                         for line in v:
+                            line = line.replace("|","/")
                             if ',' in str(line) or ';' in str(line):
                                 logger.info("List with ; or '. csv {k} line {line} is {v}")
-                                tags = [tag.strip() for tag in re.split('[,;]', str(line))]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                                for each in tags:
-                                    allkeywordsincpotentialdupes.append(each)
+                                tags1 = [tag1.strip() for tag1 in re.split('[,;]', str(line))]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                for each in tags1:
                                     if each not in v:
-                                        #valtoinsert = fix_person_tag(each)
                                         copyofkeywordlist.append(each)
-                                        logger.info(f"{each} needs adding")
+                                        logger.info(f"1.{each} needs adding")
                             elif line not in v:
-                                logger.info(f"List. {k}.  {line} line not in {v}")
-                                #valtoinsert = fix_person_tag(line)
-                                allkeywordsincpotentialdupes.append(line)
+                                logger.info(f"2.List. {k}.  {line} line not in {v}")
                                 copyofkeywordlist.append(line)
                             elif line in v:
-                                #line = fix_person_tag(line)
-                                allkeywordsincpotentialdupes.append(line)
-                                logger.info(f"{line} already in {v}")
+                                logger.debug(f"{line} already in {v}")
                             else:
                                 logger.info("shouldn't get here.  wait and see why")
                                 input()
                     else:
+                        v = v.replace("|","/")
                         logger.info(f"Not a list:{type(v)} {k}.. {v}")
                         if ',' in v or ';' in v:
                             logger.info(f"NOT a List. {k}.  {v} needs splitting")
-                            tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                            #TODO  not even using tags here !
-                            for val in valuetoinsert:
-                                    #val = fix_person_tag(val)
-                                    copyofkeywordlist.append(val)
+                            if k not in stringlist:
+                                logger.info(f"{k} is a string.  Should be a list.  forcing retag as list. {v}")
+                                forcetag = True
+                                forcewrite = True
+                            tags2 = [tag2.strip() for tag2 in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                            tags2 = tidy_tags(tags2)
+                            original_set = set(tags2)
+                            unique_elements = original_set.symmetric_difference(split_string_set)
+                            unique_elements = {x for x in unique_elements if x != ''}
+
+                            if len(unique_elements) >0 :
+                                logger.info(f"3. stringval")
+                                copyofkeywordlist = set_union(unique_elements,split_string_set)
+                            if forcetag == True:
+                                copyofkeywordlist = set_union(unique_elements,split_string_set)
+                                forcetag = False
                         else:
                             #empty value. Populate it
-                            logger.info("empty value.  Populate it")
-                            if len(v) == 0:
-                                if k != 'EXIF:XPKeywords.  Len v is zero so is not a list':
-                                    #They're all lists apart from XPKeywords
-                                    for each in keywordlist:
-                                        copyofkeywordlist.append(each)
-                                        allkeywordsincpotentialdupes.append(each) 
-                                else:
-                                    logger.info("this should be EXIF:XPKeywords")
+                            logger.info("Not a list and no ; or , value.  probably a single value")
+                            #if len(v) == 0:
+                            if k in stringlist:
+                                #They're all lists apart from XPKeywords
+                                logger.info(f"4.List. {k}")
+                                #copyofkeywordlist.extend([v] for item in copyofkeywordlist if item != v)
+                                
+                                #This should be a list so force retag
+                                forcetag = True
+                                forcewrite = True
+                                
+                                tags2 = [tag2.strip() for tag2 in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                #for val in valuetoinsert:
+                                #        if val not in v:
+                                tags2 = tidy_tags(tags2)
+                                original_set = set(tags2)
+                                #            copyofkeywordlist.append(val)
+                                unique_elements = original_set.symmetric_difference(split_string_set)
+                                unique_elements = {x for x in unique_elements if x != ''}
+                                if len(unique_elements) >0:
+                                    logger.info(f"3. stringval")
+                                    copyofkeywordlist = set_union(unique_elements,split_string_set)
+                          # Join the common elements into a single string delimited by semicolons
+                                    #copyofkeywordlist = ';'.join(common_elements)
+                                if forcetag == True:
+                                    copyofkeywordlist = set_union(unique_elements,split_string_set)
+                                    forcetag = False
                             else:
-                                logger.info("tt")
-                                if k != 'EXIF:XPKeywords':
-                                    copyofkeywordlist = [x for x in keywordlist]
+                                logger.info("this should be EXIF:XPKeywords or XMP:Categories")
+                                seen = set()
+                                if v not in keywordlist:
+                                    logger.info(f"5.")
+                                    copyofkeywordlist = [x for x in keywordlist if x not in seen and not seen.add(x)]
 
-                                    #for each in keywordlist:
-                                        #logger.info("each")
-                                        #if len(each) >mintaglength:
-                                            #each = fix_person_tag(each)
-                                        #copyofkeywordlist.append(each)
+                            #else:
+                            #    logger.info(f"EXIF:XPKeywords hopefully {k}")
+                                #if k != 'EXIF:XPKeywords':
+                                #copyofkeywordlist = [x for x in keywordlist]
 
-                                    #res[k] = copyofkeywordlist
-                                else:
-                                    #logger.info("datatoupdate")
-                                    #datatoupdate = []
-                                    #for each in keywordlist:
-                                        copyofkeywordlist.append(each)
-                                        print(f"Not sure when this is called,so wait for a keypress. I think it's EXIF:XPKeywords. {k}. {v}")
-                                        input()
-                                        #datatoupdate.append(fix_person_tag(each))
-                                    #keywordlist = datatoupdate
-                                    #if has_duplicates(keywordlist):
-                                    #keywordlist = set(keywordlist)
-                                    #res[k] = ';'.join(keywordlist)
 
+                    if tidyuptags == True:
+                        copyofkeywordlist = tidy_tags(copyofkeywordlist)
+
+                    if RemovePersonIfPeoplePresent:
+                        copyofkeywordlist = filter_person_from_list(copyofkeywordlist)
+
+                    #strip mintaglength
+                    #setb = set(copyofkeywordlist)
+                    #copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > mintaglength and str(item).strip() not in setb]
+
+                    #if fix person tag
+                    #[fix_person_tag(item) for item in copyofkeywordlist]
+
+                    #if len(copyofkeywordlist) >0:
                         #dedupe
-                        setb = set(copyofkeywordlist)
-                        #strip mintaglength
-                        copyofkeywordlist += [str(item).strip() for item in keywordlist if len(str(item).strip()) > mintaglength and str(item).strip() not in setb]
-                        #if fix person tag
-                        #[fix_person_tag(item) for item in copyofkeywordlist]
-
-                        logger.info(f"Tags ({copyofkeywordlist}) need adding to {k}")
-
-                    #logger.info("f")
-                        try:
-                            if has_duplicates(allkeywordsincpotentialdupes):
-                                dedupedkeywords[k] = set(allkeywordsincpotentialdupes)
-                                dupes = True
-                        except Exception as e:
-                            logger.error(f"has dupes exception: {e}")
+                    copyofkeywordlist = set([value for value in copyofkeywordlist if value])
 
                     try:
                         process[k] += len(copyofkeywordlist)
                     except Exception as e:
                         logger.error(f"add to array exception: {e}")
 
-                    if len(copyofkeywordlist) >0 and (',' in v or ';' in v):
-                        #if has_duplicates(copyofkeywordlist):
-                        #    copyofkeywordlist = set(copyofkeywordlist)
+                    #if len(copyofkeywordlist) >0 and ((',' in v or ';' in v) or k =="EXIF:XPKeywords") :
+                    if (k in stringlist) and len(copyofkeywordlist) >0 :
+                        #final = list(copyofkeywordlist)
+                        logger.info(f"Tags ({copyofkeywordlist}) need adding to {k}")
                         res[k] = ';'.join(copyofkeywordlist)
+                    elif len(copyofkeywordlist) >0 :
+                        final = list(copyofkeywordlist)
+                        logger.info(f"Tags ({final}) need adding to {k}")
+                        res[k] = final
                     else:
-                        res[k] = copyofkeywordlist
+                        logger.info(f"No tags need adding to {k}")
 
-                    #logger.info("sss")
                 elif k == 'XMP:Tagged':
-                    #logger.info("test")
                     if v: tagged = True
-
-        #logger.info("oo")
-
-        if dedupe == True and dupes == True:
-
-            try:
-#                with ExifToolHelper() as et:
-                et.set_tags(filetoproc, tags=dedupedkeywords,params=["-P", "-overwrite_original"])
-                logger.info(f"dedupe set tag result is : {et.last_stdout}")
-            except Exception as e:
-                logger.error(f"Error deduping: {e}")
-        elif dedupe == True and dupes == False:
-            logger.info("Dupe checking enabled and No dupes found")
 
         if any(value != 0 for value in process.values()):
         #Only modify those with updated tags
@@ -669,16 +699,20 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                 #with ExifToolHelper() as et:
                 et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
                 logger.info(f"{et.last_stdout}")
+                if '1 image files updated' not in et.last_stdout:
+                    logger.error(f"Error !!! {filetoproc}. {res} {et.last_stdout}")
             except Exception as e:
                 logger.error(f"Error b {e}")
             return True
-        elif markasprocessed and not tagged:
+        elif (markasprocessed and not tagged) or forcewrite == True:
             logger.info(f"Force marked {filetoproc} as tagged due to config")
             res['XMP:tagged'] = True
             try:
                 #with ExifToolHelper() as et:
                 et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
                 logger.info(f"{et.last_stdout}")
+                if '1 image files updated' not in et.last_stdout:
+                    logger.error(f"Error !!! {filetoproc}. {res} {et.last_stdout}")
                 return True
             except Exception as e:
                 logger.error(f"Error c {e}")
@@ -724,41 +758,43 @@ def blip_large(imagepath,model='small'):
 
 @timing_decorator
 def write_pnginfo(filename,tags):
-    if os.path.exists(filename):
-        writefile = False
-        image = Image.open(filename)
-        metadata = PngImagePlugin.PngInfo()
-        inferencefound = False
-        for key, value in image.info.items():
-            if isinstance(key, str) and isinstance(value, str):
-                if key == 'exif':
-                    logger.info("exif data breaks the file.  Skip {filename}")
-                    continue
-                elif key == 'parameters':
-                    logger.info(f"Stable Diffusion file. {filename}: {value}")
-                    metadata.add_text(key, value)
-                    sd = True
-                elif key =='Inference':
-                    logger.info(f"inference text already exists. {filename}: {value}")
-                    inferencefound = True
-                    metadata.add_text(key,value)
-                else:
-                    logger.info(f"Other: {key}.  {value}")
-                    metadata.add_text(key, value)
-        if inferencefound == False:
-            metadata.add_text('Inference',(';'.join(tags)))
-            writefile = True
+    try:
+        if os.path.exists(filename):
+            writefile = False
+            image = Image.open(filename)
+            metadata = PngImagePlugin.PngInfo()
+            inferencefound = False
+            for key, value in image.info.items():
+                if isinstance(key, str) and isinstance(value, str):
+                    if key == 'exif':
+                        logger.info("exif data breaks the file.  Skip {filename}")
+                        continue
+                    elif key == 'parameters':
+                        logger.info(f"Stable Diffusion file. {filename}: {value}")
+                        metadata.add_text(key, value)
+                        sd = True
+                    elif key =='Inference':
+                        logger.info(f"inference text already exists. {filename}: {value}")
+                        inferencefound = True
+                        metadata.add_text(key,value)
+                    else:
+                        logger.info(f"Other: {key}.  {value}")
+                        metadata.add_text(key, value)
+            if inferencefound == False:
+                metadata.add_text('Inference',(';'.join(tags)))
+                writefile = True
 
-        if writefile == True:
-            original_mtime = os.path.getmtime(filename)
-            original_atime = os.path.getatime(filename)
-            try:
-                image.save(filename,format="PNG",pnginfo=metadata)
-            except Exception as e:
-                logger.error(f"error {e}")
-            os.utime(filename, (original_atime, original_mtime))
-            logger.info(f"atime and mtime restored.")
-
+            if writefile == True:
+                original_mtime = os.path.getmtime(filename)
+                original_atime = os.path.getatime(filename)
+                try:
+                    image.save(filename,format="PNG",pnginfo=metadata)
+                except Exception as e:
+                    logger.error(f"error {e}")
+                os.utime(filename, (original_atime, original_mtime))
+                logger.info(f"atime and mtime restored.")
+    except Exception as e:
+        logger.error(f"write_pnginfo: Error {e}")
 
 @timing_decorator
 def search_replace_case_insensitive(search_pattern, replace_text, input_string):
@@ -1420,7 +1456,7 @@ localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get
 log_file_path =  os.path.join(get_script_path(),get_script_name() + '.log')
 errorlog_file_path =  os.path.join(get_script_path(),get_script_name() + '_error.log')
 
-logger = utils.setup_logging(log_file_path, errorlog_file_path, log_level='warning')
+logger = utils.setup_logging(log_file_path, errorlog_file_path, log_level='info')
 
 if current_os == "Windows":
     logger.info("Running on Windows")
@@ -1533,35 +1569,11 @@ else:
 
                             if result == None:
                                 logger.info("nothing returned from interrogation")
+                            else:
+                                print(f"  interrogator output was {result[1]}")
                         except Exception as e:
                             logger.error(f"interrogation failed.  {e}")
                          
-                    #This gets all the tags currently in the file and creates a deduplicated list
-                    mylist =[]
-                    if tmp is not False:
-                        for k,v in tmp.items():
-                                if len(v) > 0:
-                                    if isinstance(v, list):
-                                        for each in v:
-                                            #mylist.append(each)
-                                            if ',' in each or ';' in each:
-                                                    # If either a comma or semicolon is present in the value
-                                                    tags = [tag.strip() for tag in re.split('[,;]', each)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                                                    mylist = mylist + tags
-                                            else:
-                                                mylist.append(each)
-
-                                    else:
-                                        if ',' in v or ';' in v:
-                                            # If either a comma or semicolon is present in the value
-                                            tags = [tag.strip() for tag in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                                            mylist = mylist + tags
-                                        else:
-                                            mylist.append(v)
-                                else:
-                                    logger.info(f"field {k} is empty")
-                                
-
                     #result = image_to_wd14_tags(fullpath,'ViT-L-14/openai')
                     #logger.info(f"{fullpath} . {str(result)} . ViT-L-14/openai")
                     #result = image_to_wd14_tags(fullpath,'ViT-H-14/laion2b_s32b_b79')
@@ -1576,44 +1588,27 @@ else:
                     #logger.info(f"{fullpath} . {str(test)}")
                     #exit()
                     
-                    if result is not None or len(mylist) > 0:
-                        if result is not None:
-                            result2 = result[1]
-                        else:
-                            result2 = []
-                        #if len(mylist) > 0:
-                        if len(mylist) > 0:
-                            result2 = result2 + mylist
-
-                        if tidyuptags == True:
-                            result2 = tidy_tags(result2)
- 
-                        if RemovePersonIfPeoplePresent:
-                            result2 = filter_person_from_list(result2)
-
-                        #deduplicate
-                        result2 = list(set(filter(None, result2))) #remove duplicates and empty values
-                        result2 = [value for value in result2 if len(value) >= 3]  # Remove values under 3 characters in length
-
-                        test = ' '.join(result2)
+                    if result is not None:
+                        keywords = result[1]   
 
                         if CheckForPersonsNameInTags == True:
+                            test = ' '.join(keywords)
                             isperson = False
                             if is_person(test):
                                 isperson = True
-                                result2.append("ISPERSON")
+                                keywords.append("ISPERSON")
 
-                        if len(result2) > 0:
+                        if len(keywords) > 0:
                             #logger.info(str(result2))
                             #tagname = 'XPKeywords'
                             #tagname = 'EXIF:XPKeywords'
                             try:
                                 if filename.lower().endswith(('.png')):
-                                    write_pnginfo(fullpath, result2)
-                                    apply_description_keywords_tag(fullpath,result2,tag_as_processed,True)
+                                    write_pnginfo(fullpath, keywords)
+                                    apply_description_keywords_tag(fullpath,keywords,tag_as_processed,True)
                                 elif filename.lower().endswith(('.jpg')):
                                     #modify_exif_tags(fullpath, result2, 'add',None,tagname)
-                                    apply_description_keywords_tag(fullpath,result2,tag_as_processed,True)
+                                    apply_description_keywords_tag(fullpath,keywords,tag_as_processed,True)
 
                             except Exception as e:
                                 logger.error(f"writing tags failed.  {e}")

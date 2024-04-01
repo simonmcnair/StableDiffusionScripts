@@ -11,6 +11,8 @@ from requests.exceptions import HTTPError
 from urllib.parse import unquote
 from tqdm import tqdm
 from PIL import Image
+import zlib
+import gzip
 
 retry_codes = [
     HTTPStatus.TOO_MANY_REQUESTS,
@@ -33,9 +35,14 @@ def dump_to_json(filename,data,writestyle='a'):
     if not isinstance(data, dict):
         data = {"data": data}
 
-    with open(filename, writestyle, encoding='utf-8') as json_file:
-        json.dump(data, json_file, indent=2)  # indent for pretty formatting (optional)
-        json_file.write('\n')
+    while True:
+            try:
+                with open(filename, writestyle, encoding='utf-8') as json_file:
+                    json.dump(data, json_file, indent=2)  # indent for pretty formatting (optional)
+                    json_file.write('\n')
+                    return
+            except Exception as e:
+                print(f"write error.  retry {e}")
 
 def get_operating_system():
     system = platform.system()
@@ -191,6 +198,39 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
 
     return res
 
+def decode_chunked(download_fullpath, response):
+
+    try:
+        with open(download_fullpath, "wb") as file, tqdm(
+            desc="Downloading",
+            total=file_size,
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+        ) as bar:
+            # Iterate over the content in chunks and write to the file
+            for chunk in response.iter_content(chunk_size=8192):  # You can adjust the chunk size
+                if chunk:
+                    #print("chunk")
+                    file.write(chunk)
+                    bar.update(len(chunk))
+    except Exception as e:
+        print(f"failed {e}")
+
+
+    #decoded_chunks = b''
+    #for chunk in response.iter_content(decode_unicode=False):
+    #    decoded_chunks += chunk
+    #return decoded_chunks
+
+def decompress_gzip(data):
+    return gzip.decompress(data)
+
+def decompress_deflate(data):
+    return zlib.decompress(data, -zlib.MAX_WBITS)
+
+def decompress_compress(data):
+    return zlib.decompress(data, zlib.MAX_WBITS | 16)
 
 def has_parameters(filepath, extended=False):
 
@@ -323,6 +363,7 @@ def get_models():
                 id = each.get('id')
                 name = each.get('name')
                 write_to_log(logfile_path, f"processing {id}")
+                imagedownloaded= False
 
                 if each is not None and "meta" in each and each["meta"] is not None and "prompt" in each["meta"]:
                     #prompt = each["meta"]["prompt"]
@@ -330,158 +371,134 @@ def get_models():
                     postid = each['postId']
                     picid = each['id']
                     filename = f"{UserToDL}_{postid}_{picid}"
-                    if get_prompt == True:
-                        if mergedprompt == True:
-                            json_file = os.path.join(download_to,'prompts.txt')                   
-                            dump_to_json(json_file, each["meta"])
-                        else:
-                            json_file = os.path.join(download_to,filename + '.txt')
-                            dump_to_json(json_file, each["meta"],'w')
-                        #dump_to_json(prompt_file_location, each["meta"])
-                        write_to_log(logfile_path, f"prompt found for {each['url']}")
+                    for n in range(retries):
+                        try:
+                            response = requests.get(each['url'], headers=headers)
+                            #response = requests.get(url, headers=headers, params=params)
+                            response.raise_for_status()
+                            #if response.headers['Content-Type'] =='text/plain':
+                            #    print("This shouldn't happen")
+                            #    continue
+                            break
 
-                    if get_image == True:
-                        for n in range(retries):
-                            try:
-                                response = requests.get(each['url'], headers=headers)
-                                #response = requests.get(url, headers=headers, params=params)
-                                response.raise_for_status()
-                                #if response.headers['Content-Type'] =='text/plain':
-                                #    print("This shouldn't happen")
-                                #    continue
-                                break
-
-                            except HTTPError as exc:
-                                code = exc.response.status_code
-                                
-                                if code in retry_codes:
-                                    # retry after n seconds
-                                    print(f"Sleeping {n} before retry.")
-                                    time.sleep(n)
-                                    continue
-                                raise
-                            except Exception as e:
-                                print(f"A different error.  Sleep and keep retrying until done anyway. {e}")
-                                time.sleep(5)
-
-                        if 'Transfer-Encoding' in response.headers:
-                            print("chunked")
-                            if 'PNG' in str(response.content):
-                                print('Chunked PNG file')
-                                if ext == None:
-                                    ext = '.png'             
-                            elif 'JFIF' in str(response.content):
-                                print('Chunked jpg file')
-                                if ext == None:
-                                    ext = '.jpg'
-                            elif 'MP4' in str(response.content):
-                                print('Chunked MP4 file')
-                                if ext == None:
-                                    ext = '.mp4'
-                            elif 'GIF89' in str(response.content):
-                                print('Chunked MP4 file')
-                                if ext == None:
-                                    ext = '.mp4'
-                            else:    
-                                print("oof")
-                                if ext == None:
-                                    print("double oomph")
-                                    continue
+                        except HTTPError as exc:
+                            code = exc.response.status_code
+                            
+                            if code in retry_codes:
+                                # retry after n seconds
+                                print(f"Sleeping {n} before retry.")
+                                time.sleep(n)
                                 continue
+                            raise
+                        except Exception as e:
+                            print(f"A different error.  Sleep and keep retrying until done anyway. {e}")
+                            time.sleep(5)
 
-                            download_fullpath = filename + ext
-                            download_fullpath = os.path.join(download_to,download_fullpath)
-
-                            if os.path.exists(download_fullpath):
-                                print("assume it was successful")
-                            else:
-                                if response.headers['Transfer-Encoding'] == 'chunked':
-                                    try:
-                                        with open(download_fullpath, "wb") as file, tqdm(
-                                            desc="Downloading",
-                                            total=file_size,
-                                            unit="B",
-                                            unit_scale=True,
-                                            unit_divisor=1024,
-                                        ) as bar:
-                                            # Iterate over the content in chunks and write to the file
-                                            for chunk in response.iter_content(chunk_size=8192):  # You can adjust the chunk size
-                                                if chunk:
-                                                    #print("chunk")
-                                                    file.write(chunk)
-                                                    bar.update(len(chunk))
-                                    except Exception as e:
-                                        print(f"failed {e}")
-                        else:
-                            print("not chunked")
-
-                            #download_fullpath = 'c:/users/simon/desktop/1.png'
-                            file_size = int(response.headers.get("content-length", 0))
-                            ext = None
-                            if 'image/jpeg' in response.headers['content-type']:
-                                ext = '.jpg'
-                            elif 'image/png' in response.headers['content-type']:
-                                ext = '.png'
-                            elif 'video/mp4' in response.headers['content-type']:
-                                ext = '.mp4'
-                            elif 'image/gif' in response.headers['content-type']:
-                                ext = '.gif'
-                            else:
-                                print(f"don't know {response.headers['content-type']}" )
-
+                    if 'Transfer-Encoding' in response.headers:
+                        print("chunked")
+                        if 'PNG' in str(response.content):
+                            print('Chunked PNG file')
                             if ext == None:
-                                print("oomph")
-                                continue
-                            else:
-                                download_fullpath = filename + ext
-                                download_fullpath = os.path.join(download_to,download_fullpath)
+                                ext = '.png'             
+                        elif 'JFIF' in str(response.content):
+                            print('Chunked jpg file')
+                            if ext == None:
+                                ext = '.jpg'
+                        elif 'MP4' in str(response.content):
+                            print('Chunked MP4 file')
+                            if ext == None:
+                                ext = '.mp4'
+                        elif 'GIF89' in str(response.content):
+                            print('Chunked MP4 file')
+                            if ext == None:
+                                ext = '.mp4'
+                        #elif 'image/gif' in response.headers['content-type']:
+                        ##    if ext == None:
+                        #        ext = '.gif'
 
-                            if onlypng == True and response.headers['content-type'] =='image/jpeg':
-                                print("not downloading a jpg as PNG is required")
+                        else:    
+                            print("oof")
+                            if ext == None:
+                                print("double oomph")
                                 continue
-                            elif response.headers['content-type'] =='image/jpeg' and get_prompt == True:
-                                    print("Because it's a jpeg and we want to download it, we'll save the metadata too")
+                            continue
+
+                    download_fullpath = filename + ext
+                    download_fullpath = os.path.join(download_to,download_fullpath)
+
+                    if os.path.exists(download_fullpath):
+                        print("assume it was successful")
+                    else:
+                        
+                        #do stuff
+
+                        if 'Transfer-Encoding' in response.headers and response.headers['Transfer-Encoding'] == 'chunked':
+                            # Decode chunked response
+                            decoded_response = decode_chunked(download_fullpath, response)
+                        else:
+                            decoded_response = response.content
+                        
+                        # Check if the response is compressed
+                        if 'Content-Encoding' in response.headers:
+                            content_encoding = response.headers['Content-Encoding'].lower()
+                            if content_encoding == 'gzip':
+                                # Decompress gzip response
+                                decoded_response = decompress_gzip(decoded_response)
+                            elif content_encoding == 'deflate':
+                                # Decompress deflate response
+                                decoded_response = decompress_deflate(decoded_response)
+                            elif content_encoding == 'compress':
+                                # Decompress compress response
+                                decoded_response = decompress_compress(decoded_response)
+
+                    #redo
+                        if onlypng == True and response.headers['content-type'] =='image/jpeg':
+                            print("not downloading a jpg as PNG is required")
+                            continue
+                        elif response.headers['content-type'] =='image/jpeg' and get_prompt == True:
+                                print("Because it's a jpeg and we want to download it, we'll save the metadata too")
+                                json_file = os.path.join(download_to,filename + '.txt')
+                                #dump_to_json(prompt_file_location, each["meta"])
+                                dump_to_json(json_file, each["meta"],'w')
+                                write_to_log(logfile_path, f"prompt found for {each['url']}")                            
+
+                        if (os.path.exists(download_fullpath)) == True:
+                            filesize_is = os.path.getsize(download_fullpath)
+                            if file_size != filesize_is:
+                                write_to_log(logfile_path, f"File {download_fullpath} is {filesize_is} and should be {file_size}.   Failed download.")
+                                with open(download_fullpath, 'wb') as file2:
+                                    file2.write(response.content)
+                            elif (os.path.exists(download_fullpath)) == True and file_size == filesize_is:
+                                write_to_log(logfile_path, f"File is correct size ({filesize_is}).")
+
+                                if has_parameters(download_fullpath):
+                                    print("Has params")
+                                else:
+                                    print("has no params dump meta")
+                                    json_file = os.path.join(download_to,filename + '.txt')
+                                    #dump_to_json(prompt_file_location, each["meta"])
+                                    dump_to_json(json_file, each["meta"],'w')
+                                    write_to_log(logfile_path, f"prompt found for {each['url']}")     
+
+                                continue
+                        else:
+                                with open(download_fullpath, 'wb') as file2:
+                                    file2.write(response.content)
+
+                                if has_parameters(download_fullpath):
+                                    print("Has params")
+                                else:
+                                    print("has no params dump meta")
                                     json_file = os.path.join(download_to,filename + '.txt')
                                     #dump_to_json(prompt_file_location, each["meta"])
                                     dump_to_json(json_file, each["meta"],'w')
                                     write_to_log(logfile_path, f"prompt found for {each['url']}")                            
-
-                            if (os.path.exists(download_fullpath)) == True:
-                                filesize_is = os.path.getsize(download_fullpath)
-                                if file_size != filesize_is:
-                                    write_to_log(logfile_path, f"File {download_fullpath} is {filesize_is} and should be {file_size}.   Failed download.")
-                                    with open(download_fullpath, 'wb') as file2:
-                                        file2.write(response.content)
-                                elif (os.path.exists(download_fullpath)) == True and file_size == filesize_is:
-                                    write_to_log(logfile_path, f"File is correct size ({filesize_is}).")
-
-                                    if has_parameters(download_fullpath):
-                                        print("Has params")
-                                    else:
-                                        print("has no params dump meta")
-                                        json_file = os.path.join(download_to,filename + '.txt')
-                                        #dump_to_json(prompt_file_location, each["meta"])
-                                        dump_to_json(json_file, each["meta"],'w')
-                                        write_to_log(logfile_path, f"prompt found for {each['url']}")     
-
-                                    continue
-                            else:
-                                    with open(download_fullpath, 'wb') as file2:
-                                        file2.write(response.content)
-
-                                    if has_parameters(download_fullpath):
-                                        print("Has params")
-                                    else:
-                                        print("has no params dump meta")
-                                        json_file = os.path.join(download_to,filename + '.txt')
-                                        #dump_to_json(prompt_file_location, each["meta"])
-                                        dump_to_json(json_file, each["meta"],'w')
-                                        write_to_log(logfile_path, f"prompt found for {each['url']}")                            
                 else:
-                    write_to_log(logfile_path, f"** no meta found for {each['url']} **")
-        
+                    write_to_log(logfile_path, f"** no META found for {each['url']} **")
+
         req = (data['metadata'].get('nextPage'))
         write_to_log(logfile_path,f"req:  {req}")
+        
         if req == None:
             print("no more pages")
             break
