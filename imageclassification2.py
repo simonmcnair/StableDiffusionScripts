@@ -58,26 +58,6 @@ import re
 from pathlib import Path
 
 import tkinter as tk
-import nltk
-from nltk.tag.stanford import StanfordNERTagger 
-nltk.download('punkt')
-
-#sudo apt-get install default-jre-headless
-#wget https://nlp.stanford.edu/software/stanford-ner-4.2.0.zip
-#unzip stanford-ner-4.2.0.zip
-#mkdir stanford-ner
-#cp stanford-ner-4.2.0/stanford-ner.jar stanford-ner/stanford-ner.jar
-#cp stanford-ner-4.2.0/classifiers/english.all.3class.distsim.crf.ser.gz stanford-ner/english.all.3class.distsim.crf.ser.gz
-#cp stanford-ner-4.2.0/classifiers/english.all.3class.distsim.prop stanford-ner/english.all.3class.distsim.prop
-#rm -rf stanford-ner-4.2.0 stanford-ner-4.2.0.zip
-
-##wget http://nlp.stanford.edu/software/stanford-ner-2014-08-27.zip
-##unzip stanford-ner-2014-08-27.zip
-##mkdir stanford-ner
-##cp stanford-ner-2014-08-27/stanford-ner.jar stanford-ner/stanford-ner.jar
-##cp stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz stanford-ner/english.all.3class.distsim.crf.ser.gz
-##cp stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.prop stanford-ner/english.all.3class.distsim.prop
-##rm -rf stanford-ner-2014-08-27 stanford-ner-2014-08-27.zip
 
 def timing_decorator(func):
     global timing_debug
@@ -428,8 +408,14 @@ def fix_person_tag(inputvar):
 
 @timing_decorator
 def tidy_tags(lst):
-    return [item.replace("'", "").replace('"', "").replace("{", "").replace("}", "") for item in lst]
+    #return [item.replace("'", "").replace('"', "").replace("{", "").replace("}", "") for item in lst]
 
+    cleaned_lst = [item.replace("'", "").replace('"', "").replace("{", "").replace("}", "") for item in lst]
+    if cleaned_lst != lst:
+        return cleaned_lst
+    else:
+        return False
+    
 @timing_decorator
 def filter_person_from_list(lst):
     personname = None
@@ -583,6 +569,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                 logger.info(f"Tags ({keywordlist}) need adding to {each}")
                 res[each] = ';'.join(keywordlist)
         print("added all tags to blank")
+        forcewrite = True
 
     elif keywordlist != None:
         try:
@@ -628,7 +615,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     forcetag = True
                                     forcewrite = True
                                 tags2 = [tag2.strip() for tag2 in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
-                                tags2 = tidy_tags(tags2)
+                                #tags2 = tidy_tags(tags2)
                                 original_set = set(tags2)
                                 unique_elements = original_set.symmetric_difference(split_string_set)
                                 unique_elements = {x for x in unique_elements if x != ''}
@@ -655,7 +642,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     tags2 = [tag2.strip() for tag2 in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
                                     #for val in valuetoinsert:
                                     #        if val not in v:
-                                    tags2 = tidy_tags(tags2)
+                                    #tags2 = tidy_tags(tags2)
                                     original_set = set(tags2)
                                     #            copyofkeywordlist.append(val)
                                     unique_elements = original_set.symmetric_difference(split_string_set)
@@ -682,7 +669,10 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         copyofkeywordlist = list(copyofkeywordlist)
 
                         if tidyuptags == True:
-                            copyofkeywordlist = tidy_tags(copyofkeywordlist)
+                            result = tidy_tags(copyofkeywordlist)
+                            if result != False:
+                                logger.info("List was tidied.")
+                                copyofkeywordlist = result
 
                         if RemovePersonIfPeoplePresent:
                             copyofkeywordlist = filter_person_from_list(copyofkeywordlist)
@@ -1472,15 +1462,15 @@ class ImageTextDisplay:
 
 CHECK_ISTAGGED= True
 tag_as_processed = False
-gpu = True
+gpu = False
 gui = True
 interrogateImage = True
 CheckForPersonsNameInTags = False
 RemovePersonIfPeoplePresent = True
 tidyuptags = True
 timing_debug = True
-add_parent_folder_as_tag = True
-add_parent_folder_as_people_tag = True
+add_parent_folder_as_tag = False
+add_parent_folder_as_people_tag = False
 custom_tag = None
 defaultdir = '/folder/to/process'
 
@@ -1516,8 +1506,30 @@ else:
     logger.info("local override file would be " + localoverridesfile)
 
 RE_SPECIAL = re.compile(r'([\\()])')
+
 if CheckForPersonsNameInTags:
+    import nltk
+    from nltk.tag.stanford import StanfordNERTagger 
+    nltk.download('punkt')
+
+    #sudo apt-get install default-jre-headless
+    #wget https://nlp.stanford.edu/software/stanford-ner-4.2.0.zip
+    #unzip stanford-ner-4.2.0.zip
+    #mkdir stanford-ner
+    #cp stanford-ner-4.2.0/stanford-ner.jar stanford-ner/stanford-ner.jar
+    #cp stanford-ner-4.2.0/classifiers/english.all.3class.distsim.crf.ser.gz stanford-ner/english.all.3class.distsim.crf.ser.gz
+    #cp stanford-ner-4.2.0/classifiers/english.all.3class.distsim.prop stanford-ner/english.all.3class.distsim.prop
+    #rm -rf stanford-ner-4.2.0 stanford-ner-4.2.0.zip
+
+    ##wget http://nlp.stanford.edu/software/stanford-ner-2014-08-27.zip
+    ##unzip stanford-ner-2014-08-27.zip
+    ##mkdir stanford-ner
+    ##cp stanford-ner-2014-08-27/stanford-ner.jar stanford-ner/stanford-ner.jar
+    ##cp stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz stanford-ner/english.all.3class.distsim.crf.ser.gz
+    ##cp stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.prop stanford-ner/english.all.3class.distsim.prop
+    ##rm -rf stanford-ner-2014-08-27 stanford-ner-2014-08-27.zip
     st = StanfordNERTagger (get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', get_script_path() + '/stanford-ner/stanford-ner.jar')
+
 ci = None
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,expandable_segments:True"
 
