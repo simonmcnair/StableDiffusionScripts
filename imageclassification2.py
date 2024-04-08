@@ -499,15 +499,20 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     taglist =[  "IPTC:Keywords",#list
                 "XMP:TagsList",#list
                 "XMP:HierarchicalSubject",#list
-                #"XMP:Categories",#string
+                "XMP:Categories",#string
                 "XMP:CatalogSets",#list
+                "XMP:LastKeywordIPTC",#list
                 "XMP:LastKeywordXMP",#list
+                #"XMP-microsoft:LastKeywordIPTC",
+                #"XMP-microsoft:LastKeywordXMP",
+                #"MicrosoftPhoto:LastKeywordIPTC",
                 "EXIF:XPKeywords", #string
                 "XMP:Subject"]#list
 
     stringlist =[  
-                #"XMP:Categories",#string
+                "XMP:Categories",#string
                 "EXIF:XPKeywords", #string
+                "XMP:Subject"
                 ]
     mintaglength=3
     tagged = False
@@ -545,7 +550,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         process[each] = 0
     
     try:
-        #exiftaglist =  et.get_tags(files=filetoproc,tags=None)
+        test2 =  et.get_metadata(files=filetoproc)
         exiftaglist =  et.get_tags(files=filetoproc, tags=taglist)
         logger.info(f"{et.last_stdout}")
         test = exiftaglist[0]
@@ -556,7 +561,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     #if '009.jpg' in filetoproc.lower():
     #    print("test")
     
-    if (len(test) <10 and markasprocessed) or (len(test) <9 and not markasprocessed): #should be 9 returned.  MY 8 and SourceFile
+    if (len(test) < len(taglist) and markasprocessed) or (len(test) <(len(taglist)-1) and not markasprocessed): #should be 9 returned.  MY 8 and SourceFile
         logger.info("not enough tags defined in image")
         for each in taglist:
             if each not in test and each != 'XMP:tagged' and (each not in stringlist):
@@ -724,7 +729,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         except Exception as e:
             logger.error(f"Error b {e}")
         return True
-    elif (markasprocessed and not tagged) or forcewrite == True or globalforcewrite == True:
+    elif (markasprocessed and not tagged) or forcewrite == True:
         logger.info(f"Force marked {filetoproc} as tagged due to config")
         res['XMP:tagged'] = True
         try:
@@ -1473,7 +1478,6 @@ timing_debug = True
 add_parent_folder_as_tag = False
 add_parent_folder_as_people_tag = False
 custom_tag = None
-globalforcewrite = False
 defaultdir = '/folder/to/process'
 
 current_os = get_operating_system()
@@ -1535,7 +1539,7 @@ if CheckForPersonsNameInTags:
 ci = None
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,expandable_segments:True"
 
-et = ExifToolHelper()
+et = ExifToolHelper(logger=logger,common_args=['-G', '-n','-a','-P',"-overwrite_original",'-m'])
 # Start ExifTool process
 
 model_loaded = False
