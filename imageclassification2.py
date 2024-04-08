@@ -547,15 +547,14 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     try:
         #exiftaglist =  et.get_tags(files=filetoproc,tags=None)
         exiftaglist =  et.get_tags(files=filetoproc, tags=taglist)
+        logger.info(f"{et.last_stdout}")
         test = exiftaglist[0]
         #logger.info(f"get_tags output: {et.last_stdout}")
     except Exception as e:
         logger.error(f"Error a {e}")
 
-
-    
-    if '009.jpg' in filetoproc.lower():
-        print("test")
+    #if '009.jpg' in filetoproc.lower():
+    #    print("test")
     
     if (len(test) <10 and markasprocessed) or (len(test) <9 and not markasprocessed): #should be 9 returned.  MY 8 and SourceFile
         logger.info("not enough tags defined in image")
@@ -725,7 +724,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         except Exception as e:
             logger.error(f"Error b {e}")
         return True
-    elif (markasprocessed and not tagged) or forcewrite == True:
+    elif (markasprocessed and not tagged) or forcewrite == True or globalforcewrite == True:
         logger.info(f"Force marked {filetoproc} as tagged due to config")
         res['XMP:tagged'] = True
         try:
@@ -737,6 +736,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
             return True
         except Exception as e:
             logger.error(f"Error c {e}")
+    elif (markasprocessed and tagged):
+        logger.info(f"{filetoproc} marked as processed but already tagged as processed.  ")
     else:
         logger.info(f"No modifications required to {filetoproc}")
         
@@ -1472,6 +1473,7 @@ timing_debug = True
 add_parent_folder_as_tag = False
 add_parent_folder_as_people_tag = False
 custom_tag = None
+globalforcewrite = False
 defaultdir = '/folder/to/process'
 
 current_os = get_operating_system()
