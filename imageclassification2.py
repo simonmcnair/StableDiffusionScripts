@@ -1661,7 +1661,7 @@ else:
                                 if filename.lower().endswith(('.png')):
                                     write_pnginfo(fullpath, keywords)
                                     apply_description_keywords_tag(fullpath,keywords,tag_as_processed,True)
-                                elif filename.lower().endswith(('.jpg')):
+                                elif filename.lower().endswith(('.jpg', '.jpeg')):
                                     #modify_exif_tags(fullpath, result2, 'add',None,tagname)
                                     apply_description_keywords_tag(fullpath,keywords,tag_as_processed,True)
 
