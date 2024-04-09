@@ -365,7 +365,7 @@ def get_description_keywords_tag(filetoproc, istagged=False):
                     res[key] = list(set(value))
             if len(res) == 0: res = False
     except Exception as e:
-        logger.error(f"Error {e}")
+        logger.error(f"Error in get_description_keywords_tag.  {e}")
         res = False
         tagged = True
     
@@ -556,10 +556,10 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         test = exiftaglist[0]
         #logger.info(f"get_tags output: {et.last_stdout}")
     except Exception as e:
-        logger.error(f"Error a {e}")
+        logger.error(f"Error apply_description_keywords_tag get metadata {e}")
 
-    #if '009.jpg' in filetoproc.lower():
-    #    print("test")
+ #   if '232.jpg' in filetoproc.lower():
+ #       print("test")
     
     if (len(test) < len(taglist) and markasprocessed) or (len(test) <(len(taglist)-1) and not markasprocessed): #should be 9 returned.  MY 8 and SourceFile
         logger.info("not enough tags defined in image")
@@ -700,11 +700,11 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         #if len(copyofkeywordlist) >0 and ((',' in v or ';' in v) or k =="EXIF:XPKeywords") :
                         if (k in stringlist) and len(copyofkeywordlist) >0 :
                             #final = list(copyofkeywordlist)
-                            logger.info(f"Tags ({copyofkeywordlist}) need adding to {k}")
+                            logger.info(f"STRING: Tags ({copyofkeywordlist}) need adding to {k}")
                             res[k] = ';'.join(copyofkeywordlist)
                         elif len(copyofkeywordlist) >0 :
                             final = list(copyofkeywordlist)
-                            logger.info(f"Tags ({final}) need adding to {k}")
+                            logger.info(f"DICT: Tags ({final}) need adding to {k}")
                             res[k] = final
                         else:
                             logger.info(f"No tags need adding to {k}")
@@ -727,7 +727,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
             if '1 image files updated' not in et.last_stdout:
                 logger.error(f"Error !!! {filetoproc}. {res} {et.last_stdout}")
         except Exception as e:
-            logger.error(f"Error b {e}")
+            logger.error(f"Error set_tags {e}")
         return True
     elif (markasprocessed and not tagged) or forcewrite == True:
         logger.info(f"Force marked {filetoproc} as tagged due to config")
@@ -817,7 +817,7 @@ def write_pnginfo(filename,tags):
                 try:
                     image.save(filename,format="PNG",pnginfo=metadata)
                 except Exception as e:
-                    logger.error(f"error {e}")
+                    logger.error(f"error write_pnginfo {e}")
                 os.utime(filename, (original_atime, original_mtime))
                 logger.info(f"atime and mtime restored.")
     except Exception as e:
