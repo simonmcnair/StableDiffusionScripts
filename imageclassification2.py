@@ -534,7 +534,10 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     if add_parent_folder_as_tag == True:
         parentfolder = os.path.basename(os.path.dirname(filetoproc))
     if custom_tag != None:
-        keywordlist.append(custom_tag)
+        if isinstance(custom_tag, list):
+            keywordlist.extend(custom_tag)
+        else:
+            keywordlist.append(custom_tag)
     if parentfolder != None:
         if add_parent_folder_as_people_tag == True:
             keywordlist.append('People/' + parentfolder)
