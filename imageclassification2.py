@@ -514,7 +514,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                 "EXIF:XPKeywords", #string
                 "XMP:Subject"
                 ]
-    seperatorstr = ","
+    seperatorstr = ";"
     mintaglength=3
     tagged = False
     forcetag = False
