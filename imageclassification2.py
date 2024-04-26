@@ -603,7 +603,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     logger.info("List with ; or '. csv {k} line {line} is {v}")
                                     tags2 = [tag1.strip() for tag1 in re.split('[,;]', str(line))]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
                                 else:
-                                    tags2.add(str(line))
+                                    if len(line) >2:
+                                        tags2.add(str(line))
                         else:
                             if isinstance(v, (int, float)):
                                 forcewrite = True
