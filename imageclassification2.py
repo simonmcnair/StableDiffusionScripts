@@ -613,10 +613,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                             logger.info(f"Not a list:{type(v)} {k}.. {v}")
 
                             if ',' in v and seperatorstr != ',':
-                                forcewrite = True
                                 forcetag = True
                             if ';' in v and seperatorstr != ';':
-                                forcewrite = True
                                 forcetag = True
 
                             if ',' in v or ';' in v:
@@ -627,8 +625,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                 if k not in stringlist:
                                     logger.info(f"{k} is a string.  Should be a list.  forcing retag as list. {v}")
                                     forcetag = True
-                                    forcewrite = True
-                                tags2 = [tag2.strip() for tag2 in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                    tags2 = [tag2.strip() for tag2 in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
                             else:
                                 #empty value. Populate it
                                 logger.info("Not a list and no ; or , value.  probably a single value")
@@ -640,7 +637,6 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     
                                     #This should be a list so force retag
                                     forcetag = True
-                                    forcewrite = True
                                     
                                     tags2 = [tag2.strip() for tag2 in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
 
@@ -660,6 +656,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         if result != False:
                             logger.info("List was tidied.")
                             forcetag = True
+
                             copyofkeywordlist = set(result)
                         else:
                             original_set = set(sorted(tags2))
@@ -670,6 +667,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                 logger.info(f"Unique Elements: {unique_elements}")
                                 copyofkeywordlist = set_union(unique_elements,split_string_set)
                             if forcetag == True:
+                                forcewrite = True
                                 copyofkeywordlist = set_union(unique_elements,split_string_set)
                                 forcetag = False
 
