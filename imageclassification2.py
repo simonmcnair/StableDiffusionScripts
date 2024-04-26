@@ -516,11 +516,11 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     
 
     stringlist =[  
-                #"XMP:Categories",#string
+                "XMP:Categories",#string
                 "EXIF:XPKeywords", #string
                 #"XMP:Subject"
                 ]
-    seperatorstr = ","
+    seperatorstr = ";"
     mintaglength=3
     tagged = False
     forcetag = False
@@ -571,21 +571,22 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
  #   if '232.jpg' in filetoproc.lower():
  #       print("test")
 
-    lengthoftaglist = len(taglist)
+    #lengthoftaglist = len(taglist)
     
-    if (len(test) < lengthoftaglist and markasprocessed) or (len(test) <(lengthoftaglist-1) and not markasprocessed): #should be 9 returned.  MY 8 and SourceFile
-        logger.info("not enough tags defined in image")
-        for each in taglist:
-            if each not in test and each != 'XMP:tagged' and (each not in stringlist):
+#    if (len(test) < lengthoftaglist and markasprocessed) or (len(test) <(lengthoftaglist-1) and not markasprocessed): #should be 9 returned.  MY 8 and SourceFile
+#        logger.info("not enough tags defined in image")
+    for each in taglist:
+        if each not in test and each != 'XMP:tagged':
+            if (each not in stringlist):
                 logger.info(f"tag {each} does not exist in metadata for {filetoproc}")
                 res[each] = list(set([value for value in keywordlist if value]))
                 process[each] += len(res[each])
-            if (each in stringlist) and len(taglist) >0 :
+            elif (each in stringlist) :
                 #final = list(copyofkeywordlist)
                 logger.info(f"Tags ({keywordlist}) need adding to {each}")
                 res[each] = seperatorstr.join(keywordlist)
-        print("added all tags to blank")
-        forcewrite = True
+#           print("added all tags to blank")
+            forcewrite = True
 
     if keywordlist != None:
         try:
@@ -594,7 +595,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                     logger.info(f"{type(v)}: {k} = {v}")
                     allkeywordsincpotentialdupes = []    
                     copyofkeywordlist = []
-                    tags2 = set()
+                    #tags2 = set()
+                    tags2 = []
                     if k != 'SourceFile' and k != 'XMP:Tagged':               
                         if isinstance(v, list) or isinstance(v, dict):
                             logger.info(f"{type(v)}.  {k}.  {v}")
@@ -610,9 +612,11 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                 if ',' in str(line) or ';' in str(line):
                                     logger.info("List with ; or '. csv {k} line {line} is {v}")
                                     tags2 = [tag1.strip() for tag1 in re.split('[,;]', str(line))]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                    forcetag = True
                                 else:
                                     if len(line) >2:
-                                        tags2.add(str(line))
+                                        #tags2.add(str(line))
+                                        tags2.append(str(line))
                         else:
                             if isinstance(v, (int, float)):
                                 forcewrite = True
@@ -650,7 +654,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
 
                                 else:
                                     logger.info("this should be EXIF:XPKeywords or XMP:Categories")
-                                    tags2.add(str(v))
+                                    tags2.append(str(v))
+                                    #tags2.add(str(v))
                                     #seen = set()
                                     #if v not in keywordlist:
                                     #    logger.info(f"5.")
@@ -660,7 +665,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                     #for val in valuetoinsert:
                                     #        if val not in v:
 
-                        result = tidy_tags(list(tags2))
+                        result = tidy_tags(tags2)
                         if result != False:
                             logger.info("List was tidied.")
                             forcetag = True
@@ -694,16 +699,21 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                             logger.error(f"add to array exception: {e}")
 
                         #if len(copyofkeywordlist) >0 and ((',' in v or ';' in v) or k =="EXIF:XPKeywords") :
-                        if ((k in stringlist) and len(copyofkeywordlist) >0) or forcewrite == True:
-                            #final = list(copyofkeywordlist)
-                            logger.info(f"STRING: Tags ({copyofkeywordlist}) need adding to {k}")
-                            res[k] = seperatorstr.join(copyofkeywordlist)
-                        elif len(copyofkeywordlist) >0 :
-                            final = sorted(list(copyofkeywordlist))
-                            logger.info(f"DICT: Tags ({final}) need adding to {k}")
-                            res[k] = final
-                        else:
-                            logger.info(f"No tags need adding to {k}")
+                        
+                        if forcewrite == True or len(copyofkeywordlist) >0:
+                            if (k in stringlist):
+                                #final = list(copyofkeywordlist)
+                                logger.info(f"STRING: Tags ({copyofkeywordlist}) need adding to {k}")
+                                res[k] = seperatorstr.join(copyofkeywordlist)
+                            elif len(copyofkeywordlist) >0 :
+                                final = sorted(list(copyofkeywordlist))
+                                logger.info(f"DICT: Tags ({final}) need adding to {k}")
+                                res[k] = final
+                            else:
+                                logger.info(f"No tags need adding to {k}")
+                                if k in res:
+                                    del res[k]
+
 
                     elif k == 'XMP:Tagged':
                         if v: tagged = True
