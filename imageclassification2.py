@@ -510,9 +510,9 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                 "XMP:Subject"]#string
 
     stringlist =[  
-                "XMP:Categories",#string
+                #"XMP:Categories",#string
                 "EXIF:XPKeywords", #string
-                "XMP:Subject"
+                #"XMP:Subject"
                 ]
     seperatorstr = ";"
     mintaglength=3
