@@ -503,8 +503,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                 "XMP:CatalogSets",#list
                 "XMP:LastKeywordIPTC",#list
                 "XMP:LastKeywordXMP",#list
-                #"XMP-microsoft:LastKeywordIPTC",
-                #"XMP-microsoft:LastKeywordXMP",
+                "XMP-microsoft:LastKeywordIPTC",
+                "XMP-microsoft:LastKeywordXMP",
                 #"MicrosoftPhoto:LastKeywordIPTC",
                 "EXIF:XPKeywords", #string
                 "XMP:Subject"]#string
