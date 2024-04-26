@@ -614,8 +614,10 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
 
                             if ',' in v and seperatorstr != ',':
                                 forcewrite = True
+                                forcetag = True
                             if ';' in v and seperatorstr != ';':
                                 forcewrite = True
+                                forcetag = True
 
                             if ',' in v or ';' in v:
                                 logger.info(f"NOT a List. {k}.  {v} needs splitting")
