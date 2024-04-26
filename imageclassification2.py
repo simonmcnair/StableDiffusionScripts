@@ -591,21 +591,31 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         if isinstance(v, list) or isinstance(v, dict):
                             logger.info(f"{type(v)}.  {k}.  {v}")
                             for line in v:
-                                if len(line) >0 and isinstance(line, (int, float)):
+                                if isinstance(line, (int, float)):
                                     forcewrite = True
                                     continue
                                 line = str(line).replace("|","/")
+                                if ',' in line and seperatorstr != ',':
+                                    forcewrite = True
+                                if ';' in line and seperatorstr != ';':
+                                    forcewrite = True
                                 if ',' in str(line) or ';' in str(line):
                                     logger.info("List with ; or '. csv {k} line {line} is {v}")
                                     tags2 = [tag1.strip() for tag1 in re.split('[,;]', str(line))]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
                                 else:
                                     tags2.add(str(line))
                         else:
-                            if len(line) >0 and isinstance(v, (int, float)):
+                            if isinstance(v, (int, float)):
                                 forcewrite = True
                                 continue
                             v = str(v).replace("|","/")
                             logger.info(f"Not a list:{type(v)} {k}.. {v}")
+
+                            if ',' in v and seperatorstr != ',':
+                                forcewrite = True
+                            if ';' in v and seperatorstr != ';':
+                                forcewrite = True
+
                             if ',' in v or ';' in v:
                                 logger.info(f"NOT a List. {k}.  {v} needs splitting")
                                 if 'Categories' in v:
@@ -675,7 +685,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                             logger.error(f"add to array exception: {e}")
 
                         #if len(copyofkeywordlist) >0 and ((',' in v or ';' in v) or k =="EXIF:XPKeywords") :
-                        if (k in stringlist) and len(copyofkeywordlist) >0 :
+                        if ((k in stringlist) and len(copyofkeywordlist) >0) or forcewrite == True:
                             #final = list(copyofkeywordlist)
                             logger.info(f"STRING: Tags ({copyofkeywordlist}) need adding to {k}")
                             res[k] = seperatorstr.join(copyofkeywordlist)
