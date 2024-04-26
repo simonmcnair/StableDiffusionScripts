@@ -514,6 +514,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                 "EXIF:XPKeywords", #string
                 "XMP:Subject"
                 ]
+    seperatorstr = ","
     mintaglength=3
     tagged = False
     forcetag = False
@@ -574,7 +575,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
             if (each in stringlist) and len(taglist) >0 :
                 #final = list(copyofkeywordlist)
                 logger.info(f"Tags ({keywordlist}) need adding to {each}")
-                res[each] = ';'.join(keywordlist)
+                res[each] = seperatorstr.join(keywordlist)
         print("added all tags to blank")
         forcewrite = True
 
@@ -590,7 +591,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         if isinstance(v, list) or isinstance(v, dict):
                             logger.info(f"{type(v)}.  {k}.  {v}")
                             for line in v:
-                                if line.isnumeric():
+                                if len(line) >0 and isinstance(line, (int, float)):
                                     forcewrite = True
                                     continue
                                 line = str(line).replace("|","/")
@@ -600,7 +601,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                 else:
                                     tags2.add(str(line))
                         else:
-                            if v.isnumeric():
+                            if len(line) >0 and isinstance(v, (int, float)):
                                 forcewrite = True
                                 continue
                             v = str(v).replace("|","/")
@@ -677,7 +678,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                         if (k in stringlist) and len(copyofkeywordlist) >0 :
                             #final = list(copyofkeywordlist)
                             logger.info(f"STRING: Tags ({copyofkeywordlist}) need adding to {k}")
-                            res[k] = ';'.join(copyofkeywordlist)
+                            res[k] = seperatorstr.join(copyofkeywordlist)
                         elif len(copyofkeywordlist) >0 :
                             final = sorted(list(copyofkeywordlist))
                             logger.info(f"DICT: Tags ({final}) need adding to {k}")
