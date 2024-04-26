@@ -717,7 +717,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
             res['XMP:tagged'] = "true"
         try:
 #            et.set_tags(filetoproc, tags=res,params=["-v5","-m","-P", "-overwrite_original"])
-            et.set_tags(filetoproc, tags=res,params=[,"-m","-P", "-overwrite_original"])
+            et.set_tags(filetoproc, tags=res,params=["-m","-P", "-overwrite_original"])
             logger.info(f"{et.last_stdout}")
             if '1 image files updated' not in et.last_stdout:
                 logger.error(f"Error !!! {filetoproc}. {res} {et.last_stdout}")
