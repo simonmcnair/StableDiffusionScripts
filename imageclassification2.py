@@ -496,10 +496,15 @@ def has_duplicates(lst):
 @timing_decorator
 def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False,dedupe=False):
     res = {}
-    taglist =[  "IPTC:Keywords",#list
+    taglist =[  "IFD0:XPKeywords",#list
+                "IPTC:Keywords",#list
                 "XMP:TagsList",#list
+                "XMP-digiKam:TagsList",#list
+                "XMP-dc:Subject",
+                "XMP-lr:HierarchicalSubject",#list
                 "XMP:HierarchicalSubject",#list
                 "XMP:Categories",#string
+                "XMP-mediapro:CatalogSets",#list
                 "XMP:CatalogSets",#list
                 "XMP:LastKeywordIPTC",#list
                 "XMP:LastKeywordXMP",#list
@@ -508,6 +513,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                 #"MicrosoftPhoto:LastKeywordIPTC",
                 "EXIF:XPKeywords", #string
                 "XMP:Subject"]#string
+    
 
     stringlist =[  
                 #"XMP:Categories",#string
@@ -555,7 +561,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     
     try:
         test2 =  et.get_metadata(files=filetoproc)
-        exiftaglist =  et.get_tags(files=filetoproc, tags=taglist)
+        exiftaglist =  et.get_tags(files=filetoproc, tags=taglist,params=["-a","-g1","-s"])
         logger.info(f"{et.last_stdout}")
         test = exiftaglist[0]
         #logger.info(f"get_tags output: {et.last_stdout}")
@@ -564,8 +570,10 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
 
  #   if '232.jpg' in filetoproc.lower():
  #       print("test")
+
+    lengthoftaglist = len(taglist)
     
-    if (len(test) < len(taglist) and markasprocessed) or (len(test) <(len(taglist)-1) and not markasprocessed): #should be 9 returned.  MY 8 and SourceFile
+    if (len(test) < lengthoftaglist and markasprocessed) or (len(test) <(lengthoftaglist-1) and not markasprocessed): #should be 9 returned.  MY 8 and SourceFile
         logger.info("not enough tags defined in image")
         for each in taglist:
             if each not in test and each != 'XMP:tagged' and (each not in stringlist):
@@ -579,7 +587,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         print("added all tags to blank")
         forcewrite = True
 
-    elif keywordlist != None:
+    if keywordlist != None:
         try:
             for d in exiftaglist:
                 for k, v in d.items():
@@ -708,7 +716,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         if markasprocessed:
             res['XMP:tagged'] = "true"
         try:
-            et.set_tags(filetoproc, tags=res,params=["-P", "-overwrite_original"])
+#            et.set_tags(filetoproc, tags=res,params=["-v5","-m","-P", "-overwrite_original"])
+            et.set_tags(filetoproc, tags=res,params=[,"-m","-P", "-overwrite_original"])
             logger.info(f"{et.last_stdout}")
             if '1 image files updated' not in et.last_stdout:
                 logger.error(f"Error !!! {filetoproc}. {res} {et.last_stdout}")
