@@ -1622,19 +1622,17 @@ else:
                                     # else:
                                     #     logger.info(f"model {model_name} already loaded")
 
+                                #    image = Image.open(fullpath).convert('RGB')
+
+                                    processor = BlipProcessor.from_pretrained(desc)
+                                    model = BlipForConditionalGeneration.from_pretrained(desc)
                                     image = Image.open(fullpath).convert('RGB')
+                                    inputs = processor(image, return_tensors="pt")
+                                    out = model.generate(**inputs)
+                                    logger.info(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
+                                    logger.info("press a key to continue")
+                                    input()
 
-                                    from transformers import CLIPProcessor, CLIPModel
-
-                                    model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
-                                    processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
-
-                                    inputs = processor(text="", images=image, return_tensors="pt", padding=True)
-
-                                    outputs = model(**inputs)
-
-                                    print(f"{outputs}")
-                                    exit()
                                     # caption_model_name = 'blip-large' #@param ["blip-base", "blip-large", "git-large-coco"]
                                     # clip_model_name = 'ViT-L-14/openai' #@param ["ViT-L-14/openai", "ViT-H-14/laion2b_s32b_b79k"]
 
