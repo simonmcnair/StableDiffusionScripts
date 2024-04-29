@@ -2,6 +2,7 @@ __author__='Simon McNair'
 
 import os,subprocess
 
+install_requirements = False
 def setup():
     install_cmds = [
         ['pip', 'install', 'pyexiftool'],
@@ -16,7 +17,8 @@ def setup():
     for cmd in install_cmds:
         print(subprocess.run(cmd, stdout=subprocess.PIPE).stdout.decode('utf-8'))
 
-setup()
+if install_requirements:
+        setup()
 
 #python3.11 -m venv venv
 #source ./venv/bin/activate
@@ -1597,11 +1599,12 @@ else:
 
                                     image = Image.open(fullpath).convert('RGB')
                                     #ci = Interrogator(Config(clip_model_name="ViT-L-14/openai"))
-                                    ci = Interrogator(Config(clip_model_name="blip-large"))
+                                    ci = Interrogator(Config(clip_model_name="Salesforce/blip-image-captioning-large"))
                                     
                                     result = (ci.interrogate(image))
                                     print(result)
                                     input()
+
                                     if cpuandgpuinterrogation:
                                         result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
                                         result = result + result2
