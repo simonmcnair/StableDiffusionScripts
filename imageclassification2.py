@@ -1565,6 +1565,9 @@ else:
                 
                     for each,desc in modelarray.items():
                         logger.info("using: " + each)
+                        model_path = hf_hub_download(desc, filename='model.onnx')
+                        tags_path = hf_hub_download(desc, filename='selected_tags.csv')
+        
                         processor = BlipProcessor.from_pretrained(desc)
                         model = BlipForConditionalGeneration.from_pretrained(desc)
                         image = Image.open(fullpath).convert('RGB')
