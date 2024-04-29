@@ -1507,7 +1507,7 @@ if CheckForPersonsNameInTags:
     ##rm -rf stanford-ner-2014-08-27 stanford-ner-2014-08-27.zip
     st = StanfordNERTagger (get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', get_script_path() + '/stanford-ner/stanford-ner.jar')
 
-ci = None
+#ci = None
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,expandable_segments:True"
 
 et = ExifToolHelper(logger=logger,common_args=['-G', '-n','-a','-P',"-overwrite_original",'-m'])
