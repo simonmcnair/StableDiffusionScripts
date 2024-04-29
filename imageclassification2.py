@@ -155,7 +155,7 @@ def return_vram():
 
 
 @timing_decorator
-def load(clip_model_name):
+def load_inference_model(clip_model_name):
     global ci
     if ci is None:
         logger.info(f"Loading CLIP Interrogator {clip_interrogator.__version__}...")
@@ -324,8 +324,8 @@ def blip2_opt_2_7b(inputfile):
 
 @timing_decorator
 def use_GPU_interrogation(image_path,model_name="ViT-L-14/openai"):
-    
-    load("ViT-L-14/openai")
+    global ci
+    load_inference_model("ViT-L-14/openai")
         #models = list_clip_models()
     #logger.info(f"supported models are {models}")
     logger.info("load image")
