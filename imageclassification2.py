@@ -59,6 +59,23 @@ from pathlib import Path
 
 import tkinter as tk
 
+import subprocess
+
+def check_gpu_present():
+    try:
+        # Run nvidia-smi command
+        result = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE)
+        output = result.stdout.decode('utf-8')
+        
+        # Check if GPU information is present in the output
+        if 'No devices found' in output:
+            return False
+        else:
+            return True
+    except FileNotFoundError:
+        # nvidia-smi command not found, so no GPU present
+        return False
+
 def timing_decorator(func):
     global timing_debug
 
@@ -1476,6 +1493,7 @@ timing_debug = True
 add_parent_folder_as_tag = False
 add_parent_folder_as_people_tag = False
 custom_tag = None
+cpuandgpuinterrogation = False
 defaultdir = '/folder/to/process'
 
 current_os = get_operating_system()
@@ -1493,12 +1511,14 @@ if current_os == "Windows":
     # Set process priority to below normal
     p = psutil.Process()
     p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+    os = 'windows'
 
 elif current_os == "Linux":
     logger.info("Running on Linux")
     current_niceness = os.nice(0)
     print("Current niceness value:", current_niceness)
     #os.nice(-10)
+    os = 'linux'
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
@@ -1615,12 +1635,24 @@ else:
 
                     if interrogateImage == True:
                         try:
-                            if gpu == True:
-                                result = use_GPU_interrogation(fullpath)
+                            
+                            if os == 'linux' and check_gpu_present():
+                                print("GPU is present.")
+                                if gpu:
+                                    if cpuandgpuinterrogation:
+                                        result1 = use_GPU_interrogation(fullpath)
+                                        result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
+                                        result = result1 + result2
+
+                                    else:
+                                        result = use_GPU_interrogation(fullpath)
+                                else:
+                                    result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
                             else:
+                                print("No GPU found.")
                                 result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
 
-                            if result == None:
+                            if result is None:
                                 logger.info("nothing returned from interrogation")
                             else:
                                 print(f"  interrogator output was {result[1]}")
