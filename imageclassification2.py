@@ -1,5 +1,24 @@
 __author__='Simon McNair'
 
+import os,subprocess
+
+def setup():
+    install_cmds = [
+        ['pip', 'install', 'piexiftool'],
+        ['pip', 'install', 'clip-interrogator'],
+        ['pip', 'install', 'clip-onnxruntime'],
+        ['pip', 'install', 'pillow'],
+        ['pip', 'install', 'numpy'],
+        ['pip', 'install', 'huggingface_hub'],
+        ['pip', 'install', 'pandas'],
+        ['pip', 'install', 'clip-onnxruntime'],
+        ['pip', 'install', 'opencv-python'],
+    ]
+    for cmd in install_cmds:
+        print(subprocess.run(cmd, stdout=subprocess.PIPE).stdout.decode('utf-8'))
+
+setup()
+
 #python3.11 -m venv venv
 #source ./venv/bin/activate
 
@@ -10,8 +29,7 @@ __author__='Simon McNair'
 #pip install clip-interrogator==0.5.4
 # or for very latest WIP with BLIP2 support
 #pip install clip-interrogator==0.6.0
-import utils
-import time
+#pip install pyexiftool
 #pip install numpy
 #pip install huggingface_hub
 #pip install onnxruntime
@@ -21,45 +39,35 @@ import time
 #pip install keras
 #pip install tensorflow
 #sudo apt-get install python3-tk
-import torch
 
+import utils
+import time
+import torch
 import pandas as pd
 import cv2
 import numpy as np
 from typing import Mapping, Tuple, Dict
 from huggingface_hub import hf_hub_download
 from onnxruntime import InferenceSession
-
 from exiftool import ExifToolHelper
-#pip install pyexiftool
-
 #importing libraries
-import os
 import re
-
 #import glob
-
 from PIL.ExifTags import TAGS
 from PIL import Image, ImageTk
 #below for pngs
 from PIL import PngImagePlugin, Image
-#.\venv\Scripts\pip.exe install pillow
 #pip install piexif
 #import piexif
 #import piexif.helper
-
 import clip_interrogator
 from clip_interrogator import Config, Interrogator, list_clip_models
 import platform
 from transformers import BlipProcessor, BlipForConditionalGeneration
-
 import re
 #import threading
 from pathlib import Path
-
 import tkinter as tk
-
-import subprocess
 
 def check_gpu_present():
     try:
@@ -105,7 +113,6 @@ def get_script_path():
 
 @timing_decorator
 def is_person(snippet):
-
     try:
         for sent in nltk.sent_tokenize(snippet):
             tokens = nltk.tokenize.word_tokenize(sent)
@@ -190,8 +197,6 @@ def ddb(imagefile):
     with torch.no_grad():
         output = model(input_batch)
 
-
-
     with urllib.request.urlopen("https://github.com/RF5/danbooru-pretrained/raw/master/config/class_names_6000.json") as url:
         class_names = json.loads(url.read().decode())
 
@@ -205,8 +210,6 @@ def ddb(imagefile):
         txt += class_names[i] + ': {:.4f} \n'.format(probs[i].cpu().numpy())
     #plt.text(input_image.size[0]*1.05, input_image.size[1]*0.85, txt)
     return txt
-
-
 
 @timing_decorator
 def unumcloud(image):
@@ -269,8 +272,6 @@ def blip2_opt_2_7b(inputfile):
     # pip install -q -U git+https://github.com/huggingface/transformers.git
     # pip install -q -U git+https://github.com/huggingface/peft.git
     # pip install -q -U git+https://github.com/huggingface/accelerate.git
-
-
 
     nf4_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -1622,53 +1623,13 @@ else:
                                     # else:
                                     #     logger.info(f"model {model_name} already loaded")
 
-                                #    image = Image.open(fullpath).convert('RGB')
-                                    for each,desc in modelarray.items():
-                                        processor = BlipProcessor.from_pretrained(desc)
-                                        model = BlipForConditionalGeneration.from_pretrained(desc)
-                                        image = Image.open(fullpath).convert('RGB')
-                                        inputs = processor(image, return_tensors="pt")
-                                        out = model.generate(**inputs)
-                                        logger.info(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
-                                    
-                                    logger.info("press a key to continue")
+                                    result = blip_large(fullpath)
+                                    print(f"{result}")
                                     input()
-                                    exit()
-
-                                    # caption_model_name = 'blip-large' #@param ["blip-base", "blip-large", "git-large-coco"]
-                                    # clip_model_name = 'ViT-L-14/openai' #@param ["ViT-L-14/openai", "ViT-H-14/laion2b_s32b_b79k"]
-
-                                    # config = Config()
-
-                                    # config.clip_model_name = clip_model_name
-                                    # config.caption_model_name = caption_model_name
-                                    # config.device = 'cuda'
-                                    # ci = Interrogator(config)
-
-                                    # ci.config.chunk_size = 2048 if ci.config.clip_model_name == "ViT-L-14/openai" else 1024
-                                    # ci.config.flavor_intermediate_count = 2048 if ci.config.clip_model_name == "ViT-L-14/openai" else 1024
-
-                                    # #ci = Interrogator(Config(clip_model_name="ViT-L-14/openai"))
-
-                                    #     #models = list_clip_models()
-                                    # #logger.info(f"supported models are {models}")
-                                    # logger.info("load image")
-                                    # image = Image.open(fullpath).convert('RGB')
-                                    # logger.info("convert RGB")
-                                    # #ci = Interrogator(Config(clip_model_name=model_name))
-                                    # #logger.info("create CI")
-                                    # res = ci.interrogate(image)
-                                    # logger.info ("interrogation complete")
-                                    # logger.info(res)
 
                                     if cpuandgpuinterrogation:
                                         result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
                                         result = result + result2
-
-
-
-
-
                             else:
                                 print("No GPU found.")
                                 result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
