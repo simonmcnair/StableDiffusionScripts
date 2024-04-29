@@ -279,7 +279,8 @@ def blip2_opt_2_7b(inputfile):
     bnb_4bit_compute_dtype=torch.bfloat16
     )
 
-    
+    #ViT-L-14/openai
+
     processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
     #model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", load_in_8bit=True, device_map="auto")
     model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", load_in_4bit=True, device_map="auto")
@@ -1573,9 +1574,7 @@ else:
                     # break
 
                     #result = ddb(fullpath)
-                    result = blip2_opt_2_7b(fullpath)
-                    print(f"result is {result}")
-                    input()
+
                     #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
                     #logger.info(f"{fullpath} . {str(result)} . wd14-vit-v2") 
                     #result = image_to_wd14_tags(fullpath,'wd14-convnext')
@@ -1596,10 +1595,13 @@ else:
                                 print("GPU is present.")
                                 if gpu:
 
-                                    result = blip_large(fullpath)
-                                    print(f"{result[1]}")
+                                    image = Image.open(fullpath).convert('RGB')
+                                    #ci = Interrogator(Config(clip_model_name="ViT-L-14/openai"))
+                                    ci = Interrogator(Config(clip_model_name="blip-large"))
+                                    
+                                    result = (ci.interrogate(image))
+                                    print(result)
                                     input()
-
                                     if cpuandgpuinterrogation:
                                         result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
                                         result = result + result2
