@@ -201,14 +201,15 @@ def ddb(imagefile):
 
     # The output has unnormalized scores. To get probabilities, you can run a sigmoid on it.
     probs =  torch.sigmoid(output[0]) # Tensor of shape 6000, with confidence scores over Danbooru's top 6000 tags
-    thresh=0.2
+    thresh=0.8
     tmp = probs[probs > thresh]
     inds = probs.argsort(descending=True)
     txt = 'Predictions with probabilities above ' + str(thresh) + ':\n'
     for i in inds[0:len(tmp)]:
         txt += class_names[i] + ': {:.4f} \n'.format(probs[i].cpu().numpy())
     #plt.text(input_image.size[0]*1.05, input_image.size[1]*0.85, txt)
-    return txt
+    return tmp
+#    return txt
 
 @timing_decorator
 def unumcloud(image):
@@ -1572,8 +1573,7 @@ else:
                     # break
 
                     result = ddb(fullpath)
-                    for each in result:
-                        print(f"{each}")
+                    print(f"{result}")
                     #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
                     #logger.info(f"{fullpath} . {str(result)} . wd14-vit-v2") 
                     #result = image_to_wd14_tags(fullpath,'wd14-convnext')
