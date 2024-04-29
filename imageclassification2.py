@@ -1563,17 +1563,17 @@ else:
                     logger.info(f"{fullpath} - Not tagged continuing")
                     result = None
                 
-                    # for each,desc in modelarray.items():
-                    #     logger.info("using: " + each)
-                    #     processor = BlipProcessor.from_pretrained(desc)
-                    #     model = BlipForConditionalGeneration.from_pretrained(desc)
-                    #     image = Image.open(fullpath).convert('RGB')
-                    #     inputs = processor(image, return_tensors="pt")
-                    #     out = model.generate(**inputs)
-                    #     logger.info(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
-                    #     logger.info("press a key to continue")
-                    #     input()
-                    # break
+                     for each,desc in modelarray.items():
+                         logger.info("using: " + each)
+                         processor = BlipProcessor.from_pretrained(desc)
+                         model = BlipForConditionalGeneration.from_pretrained(desc)
+                         image = Image.open(fullpath).convert('RGB')
+                         inputs = processor(image, return_tensors="pt")
+                         out = model.generate(**inputs)
+                         logger.info(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
+                         logger.info("press a key to continue")
+                         input()
+                     break
 
                     #result = ddb(fullpath)
 
@@ -1597,12 +1597,12 @@ else:
                                 print("GPU is present.")
                                 if gpu:
 
-                                    image = Image.open(fullpath).convert('RGB')
+                                    #image = Image.open(fullpath).convert('RGB')
                                     #ci = Interrogator(Config(clip_model_name="ViT-L-14/openai"))
-                                    ci = Interrogator(Config(clip_model_name="Salesforce/blip-image-captioning-large"))
+                                    #ci = Interrogator(Config(clip_model_name="Salesforce/blip-image-captioning-large"))
                                     
-                                    result = (ci.interrogate(image))
-                                    print(result)
+                                    #result = (ci.interrogate(image))
+                                    #print(result)
                                     input()
 
                                     if cpuandgpuinterrogation:
