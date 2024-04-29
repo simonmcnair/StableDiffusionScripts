@@ -156,7 +156,7 @@ def return_vram():
 
 @timing_decorator
 def load_inference_model(clip_model_name):
-    global ci
+    #global ci
     if ci is None:
         logger.info(f"Loading CLIP Interrogator for the first time{clip_interrogator.__version__}...")
 
@@ -165,10 +165,10 @@ def load_inference_model(clip_model_name):
             clip_model_name=clip_model_name,
         )
 
-        if low_vram:
-            logger.info("low vram")
-            config.apply_low_vram_defaults()
-            config.chunk_size = 512
+        #if low_vram:
+        #    logger.info("low vram")
+        #    config.apply_low_vram_defaults()
+        #    config.chunk_size = 512
         ci = Interrogator(config)
 
     elif clip_model_name != ci.config.clip_model_name:
@@ -326,8 +326,8 @@ def blip2_opt_2_7b(inputfile):
 
 @timing_decorator
 def use_GPU_interrogation(image_path,model_name="ViT-L-14/openai"):
-    global ci
-    load_inference_model("ViT-L-14/openai")
+    #global ci
+    load_inference_model(model_name)
         #models = list_clip_models()
     #logger.info(f"supported models are {models}")
     logger.info("load image")
