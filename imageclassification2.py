@@ -1633,7 +1633,7 @@ else:
                                     config.caption_model_name = caption_model_name
                                     ci = Interrogator(config)
 
-                                    ci = Interrogator(Config(clip_model_name="ViT-L-14/openai"))
+                                    #ci = Interrogator(Config(clip_model_name="ViT-L-14/openai"))
 
                                         #models = list_clip_models()
                                     #logger.info(f"supported models are {models}")
