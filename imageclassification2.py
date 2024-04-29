@@ -11,7 +11,6 @@ def setup():
         ['pip', 'install', 'numpy'],
         ['pip', 'install', 'huggingface_hub'],
         ['pip', 'install', 'pandas'],
-        ['pip', 'install', 'clip-onnxruntime'],
         ['pip', 'install', 'opencv-python'],
     ]
     for cmd in install_cmds:
@@ -1573,7 +1572,8 @@ else:
                     # break
 
                     result = ddb(fullpath)
-                    print(f"{result}")
+                    for each in result:
+                        print(f"{each}")
                     #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
                     #logger.info(f"{fullpath} . {str(result)} . wd14-vit-v2") 
                     #result = image_to_wd14_tags(fullpath,'wd14-convnext')
