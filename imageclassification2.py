@@ -293,6 +293,7 @@ def blip2_opt_2_7b(inputfile):
 
     out = model.generate(**inputs)
     logger.info(processor.decode(out[0], skip_special_tokens=True).strip())
+    return out[0]
 
 @timing_decorator
 def get_description_keywords_tag(filetoproc, istagged=False):
@@ -1571,7 +1572,8 @@ else:
                     #     input()
                     # break
 
-                    result = ddb(fullpath)
+                    #result = ddb(fullpath)
+                    result = blip2_opt_2_7b
                     print(f"{result}")
                     input()
                     #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
