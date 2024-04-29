@@ -1636,7 +1636,7 @@ else:
                     if interrogateImage == True:
                         try:
                             
-                            if os == 'linux' and check_gpu_present():
+                            if current_os == 'Linux' and check_gpu_present():
                                 print("GPU is present.")
                                 if gpu:
                                     if cpuandgpuinterrogation:
