@@ -1622,30 +1622,44 @@ else:
                                     # else:
                                     #     logger.info(f"model {model_name} already loaded")
 
-                                    caption_model_name = 'blip-large' #@param ["blip-base", "blip-large", "git-large-coco"]
-                                    clip_model_name = 'ViT-L-14/openai' #@param ["ViT-L-14/openai", "ViT-H-14/laion2b_s32b_b79k"]
-
-                                    config = Config()
-
-                                    config.clip_model_name = clip_model_name
-                                    config.caption_model_name = caption_model_name
-                                    ci = Interrogator(config)
-
-                                    ci.config.chunk_size = 2048 if ci.config.clip_model_name == "ViT-L-14/openai" else 1024
-                                    ci.config.flavor_intermediate_count = 2048 if ci.config.clip_model_name == "ViT-L-14/openai" else 1024
-
-                                    #ci = Interrogator(Config(clip_model_name="ViT-L-14/openai"))
-
-                                        #models = list_clip_models()
-                                    #logger.info(f"supported models are {models}")
-                                    logger.info("load image")
                                     image = Image.open(fullpath).convert('RGB')
-                                    logger.info("convert RGB")
-                                    #ci = Interrogator(Config(clip_model_name=model_name))
-                                    #logger.info("create CI")
-                                    res = ci.interrogate(image)
-                                    logger.info ("interrogation complete")
-                                    logger.info(res)
+
+                                    from transformers import CLIPProcessor, CLIPModel
+
+                                    model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+                                    processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+
+                                    inputs = processor(images=image, return_tensors="pt", padding=True)
+
+                                    outputs = model(**inputs)
+
+                                    print(f"{outputs}")
+                                    exit()
+                                    # caption_model_name = 'blip-large' #@param ["blip-base", "blip-large", "git-large-coco"]
+                                    # clip_model_name = 'ViT-L-14/openai' #@param ["ViT-L-14/openai", "ViT-H-14/laion2b_s32b_b79k"]
+
+                                    # config = Config()
+
+                                    # config.clip_model_name = clip_model_name
+                                    # config.caption_model_name = caption_model_name
+                                    # config.device = 'cuda'
+                                    # ci = Interrogator(config)
+
+                                    # ci.config.chunk_size = 2048 if ci.config.clip_model_name == "ViT-L-14/openai" else 1024
+                                    # ci.config.flavor_intermediate_count = 2048 if ci.config.clip_model_name == "ViT-L-14/openai" else 1024
+
+                                    # #ci = Interrogator(Config(clip_model_name="ViT-L-14/openai"))
+
+                                    #     #models = list_clip_models()
+                                    # #logger.info(f"supported models are {models}")
+                                    # logger.info("load image")
+                                    # image = Image.open(fullpath).convert('RGB')
+                                    # logger.info("convert RGB")
+                                    # #ci = Interrogator(Config(clip_model_name=model_name))
+                                    # #logger.info("create CI")
+                                    # res = ci.interrogate(image)
+                                    # logger.info ("interrogation complete")
+                                    # logger.info(res)
 
                                     if cpuandgpuinterrogation:
                                         result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
