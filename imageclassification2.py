@@ -4,7 +4,7 @@ import os,subprocess
 
 def setup():
     install_cmds = [
-        ['pip', 'install', 'piexiftool'],
+        ['pip', 'install', 'pyexiftool'],
         ['pip', 'install', 'clip-interrogator'],
         ['pip', 'install', 'clip-onnxruntime'],
         ['pip', 'install', 'pillow'],
@@ -1572,7 +1572,8 @@ else:
                     #     input()
                     # break
 
-                    #result = ddb(fullpath)
+                    result = ddb(fullpath)
+                    print(f"{result}")
                     #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
                     #logger.info(f"{fullpath} . {str(result)} . wd14-vit-v2") 
                     #result = image_to_wd14_tags(fullpath,'wd14-convnext')
@@ -1592,36 +1593,6 @@ else:
                             if current_os == 'Linux' and check_gpu_present():
                                 print("GPU is present.")
                                 if gpu:
-
-                                    #result = use_GPU_interrogation(fullpath)
-                                    # model_name="ViT-L-14/openai"
-                                    # #global ci
-
-                                    # if ci is None:
-                                    #     logger.info(f"Loading CLIP Interrogator for the first time{clip_interrogator.__version__}...")
-
-                                    #     config = Config(
-                                    #         cache_path = 'models/clip-interrogator',
-                                    #         clip_model_name=model_name,
-                                    #     )
-
-                                    #     #if low_vram:
-                                    #     #    logger.info("low vram")
-                                    #     #    config.apply_low_vram_defaults()
-                                    #     #    config.chunk_size = 512
-                                    #     ci = Interrogator(config)
-
-                                    # elif model_name != ci.config.clip_model_name:
-                                    #     logger.info(f"Changing CLIP Interrogator from {ci.config.clip_model_name} to {model_name}...")
-
-                                    #     ci.config.clip_model_name = model_name
-                                    #     torch_gc()
-                                    #     #with Timer() as modelloadtime:
-                                    #     ci.load_clip_model()
-                                    #     #logger.info(f"loading model took {modelloadtime.last} to load")
-                                    #     #return res, modelloadtime.last
-                                    # else:
-                                    #     logger.info(f"model {model_name} already loaded")
 
                                     result = blip_large(fullpath)
                                     print(f"{result}")
