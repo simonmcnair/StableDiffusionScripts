@@ -153,36 +153,6 @@ def return_vram():
         vram_total_mb = torch.cuda.get_device_properties('cuda').total_memory / (1024**2)
     return vram_total_mb
 
-
-@timing_decorator
-def load_inference_model(clip_model_name):
-    #global ci
-    if ci is None:
-        logger.info(f"Loading CLIP Interrogator for the first time{clip_interrogator.__version__}...")
-
-        config = Config(
-            cache_path = 'models/clip-interrogator',
-            clip_model_name=clip_model_name,
-        )
-
-        #if low_vram:
-        #    logger.info("low vram")
-        #    config.apply_low_vram_defaults()
-        #    config.chunk_size = 512
-        ci = Interrogator(config)
-
-    elif clip_model_name != ci.config.clip_model_name:
-        logger.info(f"Changing CLIP Interrogator from {ci.config.clip_model_name} to {clip_model_name}...")
-
-        ci.config.clip_model_name = clip_model_name
-        torch_gc()
-        #with Timer() as modelloadtime:
-        ci.load_clip_model()
-        #logger.info(f"loading model took {modelloadtime.last} to load")
-        #return res, modelloadtime.last
-    else:
-        logger.info(f"model {clip_model_name} already loaded")
-
 @timing_decorator
 def ddb(imagefile):
 
@@ -323,23 +293,6 @@ def blip2_opt_2_7b(inputfile):
 
     out = model.generate(**inputs)
     logger.info(processor.decode(out[0], skip_special_tokens=True).strip())
-
-@timing_decorator
-def use_GPU_interrogation(image_path,model_name="ViT-L-14/openai"):
-    #global ci
-    load_inference_model(model_name)
-        #models = list_clip_models()
-    #logger.info(f"supported models are {models}")
-    logger.info("load image")
-    image = Image.open(image_path).convert('RGB')
-    logger.info("convert RGB")
-    #ci = Interrogator(Config(clip_model_name=model_name))
-    #logger.info("create CI")
-    res = ci.interrogate(image)
-    logger.info ("interrogation complete")
-    logger.info(res)
-    return (res)
-
 
 @timing_decorator
 def get_description_keywords_tag(filetoproc, istagged=False):
@@ -1638,14 +1591,56 @@ else:
                             if current_os == 'Linux' and check_gpu_present():
                                 print("GPU is present.")
                                 if gpu:
+
+                                    #result = use_GPU_interrogation(fullpath)
+                                        model_name="ViT-L-14/openai"):
+                                        #global ci
+
+                                        if ci is None:
+                                            logger.info(f"Loading CLIP Interrogator for the first time{clip_interrogator.__version__}...")
+
+                                            config = Config(
+                                                cache_path = 'models/clip-interrogator',
+                                                clip_model_name=model_name,
+                                            )
+
+                                            #if low_vram:
+                                            #    logger.info("low vram")
+                                            #    config.apply_low_vram_defaults()
+                                            #    config.chunk_size = 512
+                                            ci = Interrogator(config)
+
+                                        elif model_name != ci.config.clip_model_name:
+                                            logger.info(f"Changing CLIP Interrogator from {ci.config.clip_model_name} to {model_name}...")
+
+                                            ci.config.clip_model_name = model_name
+                                            torch_gc()
+                                            #with Timer() as modelloadtime:
+                                            ci.load_clip_model()
+                                            #logger.info(f"loading model took {modelloadtime.last} to load")
+                                            #return res, modelloadtime.last
+                                        else:
+                                            logger.info(f"model {model_name} already loaded")
+
+                                            #models = list_clip_models()
+                                        #logger.info(f"supported models are {models}")
+                                        logger.info("load image")
+                                        image = Image.open(fullpath).convert('RGB')
+                                        logger.info("convert RGB")
+                                        #ci = Interrogator(Config(clip_model_name=model_name))
+                                        #logger.info("create CI")
+                                        res = ci.interrogate(image)
+                                        logger.info ("interrogation complete")
+                                        logger.info(res)
+
                                     if cpuandgpuinterrogation:
-                                        result1 = use_GPU_interrogation(fullpath)
                                         result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
-                                        result = result1 + result2
-                                    else:
-                                        result = use_GPU_interrogation(fullpath)
-                                else:
-                                    result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
+                                        result = result + result2
+
+
+
+
+
                             else:
                                 print("No GPU found.")
                                 result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
