@@ -1593,45 +1593,45 @@ else:
                                 if gpu:
 
                                     #result = use_GPU_interrogation(fullpath)
-                                        model_name="ViT-L-14/openai"):
-                                        #global ci
+                                    model_name="ViT-L-14/openai"
+                                    #global ci
 
-                                        if ci is None:
-                                            logger.info(f"Loading CLIP Interrogator for the first time{clip_interrogator.__version__}...")
+                                    if ci is None:
+                                        logger.info(f"Loading CLIP Interrogator for the first time{clip_interrogator.__version__}...")
 
-                                            config = Config(
-                                                cache_path = 'models/clip-interrogator',
-                                                clip_model_name=model_name,
-                                            )
+                                        config = Config(
+                                            cache_path = 'models/clip-interrogator',
+                                            clip_model_name=model_name,
+                                        )
 
-                                            #if low_vram:
-                                            #    logger.info("low vram")
-                                            #    config.apply_low_vram_defaults()
-                                            #    config.chunk_size = 512
-                                            ci = Interrogator(config)
+                                        #if low_vram:
+                                        #    logger.info("low vram")
+                                        #    config.apply_low_vram_defaults()
+                                        #    config.chunk_size = 512
+                                        ci = Interrogator(config)
 
-                                        elif model_name != ci.config.clip_model_name:
-                                            logger.info(f"Changing CLIP Interrogator from {ci.config.clip_model_name} to {model_name}...")
+                                    elif model_name != ci.config.clip_model_name:
+                                        logger.info(f"Changing CLIP Interrogator from {ci.config.clip_model_name} to {model_name}...")
 
-                                            ci.config.clip_model_name = model_name
-                                            torch_gc()
-                                            #with Timer() as modelloadtime:
-                                            ci.load_clip_model()
-                                            #logger.info(f"loading model took {modelloadtime.last} to load")
-                                            #return res, modelloadtime.last
-                                        else:
-                                            logger.info(f"model {model_name} already loaded")
+                                        ci.config.clip_model_name = model_name
+                                        torch_gc()
+                                        #with Timer() as modelloadtime:
+                                        ci.load_clip_model()
+                                        #logger.info(f"loading model took {modelloadtime.last} to load")
+                                        #return res, modelloadtime.last
+                                    else:
+                                        logger.info(f"model {model_name} already loaded")
 
-                                            #models = list_clip_models()
-                                        #logger.info(f"supported models are {models}")
-                                        logger.info("load image")
-                                        image = Image.open(fullpath).convert('RGB')
-                                        logger.info("convert RGB")
-                                        #ci = Interrogator(Config(clip_model_name=model_name))
-                                        #logger.info("create CI")
-                                        res = ci.interrogate(image)
-                                        logger.info ("interrogation complete")
-                                        logger.info(res)
+                                        #models = list_clip_models()
+                                    #logger.info(f"supported models are {models}")
+                                    logger.info("load image")
+                                    image = Image.open(fullpath).convert('RGB')
+                                    logger.info("convert RGB")
+                                    #ci = Interrogator(Config(clip_model_name=model_name))
+                                    #logger.info("create CI")
+                                    res = ci.interrogate(image)
+                                    logger.info ("interrogation complete")
+                                    logger.info(res)
 
                                     if cpuandgpuinterrogation:
                                         result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
