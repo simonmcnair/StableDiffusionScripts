@@ -171,15 +171,15 @@ def load(clip_model_name):
             config.chunk_size = 512
         ci = Interrogator(config)
 
-    if clip_model_name != ci.config.clip_model_name:
-
-
+    elif clip_model_name != ci.config.clip_model_name:
         ci.config.clip_model_name = clip_model_name
         torch_gc()
         #with Timer() as modelloadtime:
         ci.load_clip_model()
         #logger.info(f"loading model took {modelloadtime.last} to load")
         #return res, modelloadtime.last
+    else:
+        logger.info(f"model {clip_model_name} already loaded")
 
 @timing_decorator
 def ddb(imagefile):
@@ -1633,7 +1633,6 @@ else:
 
                     if interrogateImage == True:
                         try:
-                            
                             if current_os == 'Linux' and check_gpu_present():
                                 print("GPU is present.")
                                 if gpu:
@@ -1641,7 +1640,6 @@ else:
                                         result1 = use_GPU_interrogation(fullpath)
                                         result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
                                         result = result1 + result2
-
                                     else:
                                         result = use_GPU_interrogation(fullpath)
                                 else:
