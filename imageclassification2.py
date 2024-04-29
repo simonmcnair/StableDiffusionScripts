@@ -158,7 +158,7 @@ def return_vram():
 def load_inference_model(clip_model_name):
     global ci
     if ci is None:
-        logger.info(f"Loading CLIP Interrogator {clip_interrogator.__version__}...")
+        logger.info(f"Loading CLIP Interrogator for the first time{clip_interrogator.__version__}...")
 
         config = Config(
             cache_path = 'models/clip-interrogator',
@@ -172,6 +172,8 @@ def load_inference_model(clip_model_name):
         ci = Interrogator(config)
 
     elif clip_model_name != ci.config.clip_model_name:
+        logger.info(f"Changing CLIP Interrogator from {ci.config.clip_model_name} to {clip_model_name}...")
+
         ci.config.clip_model_name = clip_model_name
         torch_gc()
         #with Timer() as modelloadtime:
