@@ -6,7 +6,7 @@ def setup():
     install_cmds = [
         ['pip', 'install', 'pyexiftool'],
         ['pip', 'install', 'clip-interrogator'],
-        ['pip', 'install', 'clip-onnxruntime'],
+        ['pip', 'install', 'onnxruntime'],
         ['pip', 'install', 'pillow'],
         ['pip', 'install', 'numpy'],
         ['pip', 'install', 'huggingface_hub'],
@@ -1595,7 +1595,7 @@ else:
                                 if gpu:
 
                                     result = blip_large(fullpath)
-                                    print(f"{result}")
+                                    print(f"{result[1]}")
                                     input()
 
                                     if cpuandgpuinterrogation:
