@@ -1622,6 +1622,17 @@ else:
                                     # else:
                                     #     logger.info(f"model {model_name} already loaded")
 
+                                    caption_model_name = 'blip-large' #@param ["blip-base", "blip-large", "git-large-coco"]
+                                    clip_model_name = 'ViT-L-14/openai' #@param ["ViT-L-14/openai", "ViT-H-14/laion2b_s32b_b79k"]
+
+                                    ci.config.chunk_size = 2048 if ci.config.clip_model_name == "ViT-L-14/openai" else 1024
+                                    ci.config.flavor_intermediate_count = 2048 if ci.config.clip_model_name == "ViT-L-14/openai" else 1024
+
+                                    config = Config()
+                                    config.clip_model_name = clip_model_name
+                                    config.caption_model_name = caption_model_name
+                                    ci = Interrogator(config)
+
                                     ci = Interrogator(Config(clip_model_name="ViT-L-14/openai"))
 
                                         #models = list_clip_models()
