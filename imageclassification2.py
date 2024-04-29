@@ -496,28 +496,30 @@ def has_duplicates(lst):
 @timing_decorator
 def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False,dedupe=False):
     res = {}
-    taglist =[  "IFD0:XPKeywords",#list
-                "IPTC:Keywords",#list
-                "XMP:TagsList",#list
-                "XMP-digiKam:TagsList",#list
-                "XMP-dc:Subject",
-                "XMP-lr:HierarchicalSubject",#list
-                "XMP:HierarchicalSubject",#list
-                "XMP:Categories",#string
-                "XMP-mediapro:CatalogSets",#list
-                "XMP:CatalogSets",#list
-                "XMP:LastKeywordIPTC",#list
-                "XMP:LastKeywordXMP",#list
-                "XMP-microsoft:LastKeywordIPTC",
-                "XMP-microsoft:LastKeywordXMP",
+    taglist =[  #"IFD0:XPKeywords",#list
+                #"IPTC:Keywords",#list
+                #"XMP:TagsList",#list
+                #"XMP-digiKam:TagsList",#list
+                #"XMP-dc:Subject",
+                "MWG:Keywords",
+                #"XMP-lr:HierarchicalSubject",#list
+                #"XMP:HierarchicalSubject",#list
+                #"XMP-acdsee:Categories",#string
+                #"XMP-mediapro:CatalogSets",#list
+                #"XMP:CatalogSets",#list
+                #"XMP:LastKeywordIPTC",#list
+                #"XMP:LastKeywordXMP",#list
+                #"XMP-microsoft:LastKeywordIPTC",
+                #"XMP-microsoft:LastKeywordXMP",
                 #"MicrosoftPhoto:LastKeywordIPTC",
-                "EXIF:XPKeywords", #string
-                "XMP:Subject"]#string
+                #"EXIF:XPKeywords", #string
+                #"XMP:Subject"
+                ]#string
     
-
     stringlist =[  
-                "XMP:Categories",#string
-                "EXIF:XPKeywords", #string
+                #"XMP:Categories",#string
+                #"EXIF:XPKeywords", #string
+                #"IFD0:XPKeywords",
                 #"XMP:Subject"
                 ]
     seperatorstr = ";"
@@ -634,10 +636,10 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
                                 if 'Categories' in v:
                                     logger.debug("categories detected")
                                     v = v.replace('<Categories>','').replace('<Category Assigned=1>','').replace('<Category Assigned=0>','').replace('</Category>',';').replace('</Categories>','')
-                                if k not in stringlist:
-                                    logger.info(f"{k} is a string.  Should be a list.  forcing retag as list. {v}")
-                                    forcetag = True
-                                    tags2 = [tag2.strip() for tag2 in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
+                                #if k not in stringlist:
+                                logger.info(f"{k} is a string.  Should be a list.  forcing retag as list. {v}")
+                                forcetag = True
+                                tags2 = [tag2.strip() for tag2 in re.split('[,;]', v)]  # Split the string into a list using commas and semicolons as delimiters, and remove leading/trailing spaces
                             else:
                                 #empty value. Populate it
                                 logger.info("Not a list and no ; or , value.  probably a single value")
@@ -726,8 +728,12 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         if markasprocessed:
             res['XMP:tagged'] = "true"
         try:
+            et.execute(*["-m","-P","-all=","-tagsfromfile","@","-all", "-overwrite_original", filetoproc])
 #            et.set_tags(filetoproc, tags=res,params=["-v5","-m","-P", "-overwrite_original"])
+            #et.execute(*["-m","-P", "-overwrite_original","-ifd0-= -iptc-= -exif-=", filetoproc])
+
             et.set_tags(filetoproc, tags=res,params=["-m","-P", "-overwrite_original"])
+            #exiftool -ifd0:imagedescription= 
             logger.info(f"{et.last_stdout}")
             if '1 image files updated' not in et.last_stdout:
                 logger.error(f"Error !!! {filetoproc}. {res} {et.last_stdout}")
