@@ -206,10 +206,11 @@ def ddb(imagefile):
     inds = probs.argsort(descending=True)
     txt = 'Predictions with probabilities above ' + str(thresh) + ':\n'
     for i in inds[0:len(tmp)]:
-        txt += class_names[i] + ': {:.4f} \n'.format(probs[i].cpu().numpy())
+        #txt += class_names[i] + ': {:.4f} \n'.format(probs[i].cpu().numpy())
+        txt += class_names[i]
     #plt.text(input_image.size[0]*1.05, input_image.size[1]*0.85, txt)
-    return tmp
-#    return txt
+    #return tmp
+    return txt
 
 @timing_decorator
 def unumcloud(image):
