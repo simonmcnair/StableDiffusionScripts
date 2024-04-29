@@ -1630,8 +1630,10 @@ else:
                                         inputs = processor(image, return_tensors="pt")
                                         out = model.generate(**inputs)
                                         logger.info(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
-                                        logger.info("press a key to continue")
-                                        input()
+                                    
+                                    logger.info("press a key to continue")
+                                    input()
+                                    exit()
 
                                     # caption_model_name = 'blip-large' #@param ["blip-base", "blip-large", "git-large-coco"]
                                     # clip_model_name = 'ViT-L-14/openai' #@param ["ViT-L-14/openai", "ViT-H-14/laion2b_s32b_b79k"]
