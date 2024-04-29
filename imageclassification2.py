@@ -1573,8 +1573,8 @@ else:
                     # break
 
                     #result = ddb(fullpath)
-                    result = blip2_opt_2_7b
-                    print(f"{result}")
+                    result = blip2_opt_2_7b(fullpath)
+                    print(f"result is {result}")
                     input()
                     #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
                     #logger.info(f"{fullpath} . {str(result)} . wd14-vit-v2") 
