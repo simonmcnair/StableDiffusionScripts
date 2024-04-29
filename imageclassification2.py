@@ -1511,14 +1511,12 @@ if current_os == "Windows":
     # Set process priority to below normal
     p = psutil.Process()
     p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
-    os = 'windows'
 
 elif current_os == "Linux":
     logger.info("Running on Linux")
     current_niceness = os.nice(0)
     print("Current niceness value:", current_niceness)
     #os.nice(-10)
-    os = 'linux'
 
 if os.path.exists(localoverridesfile):
     exec(open(localoverridesfile).read())
