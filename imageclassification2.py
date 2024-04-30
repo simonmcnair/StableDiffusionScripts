@@ -1250,18 +1250,23 @@ else:
                                     #result = (ci.interrogate(image))
                                     #print(result)
                                     result = image_to_wd14_tags(fullpath,'wd-v1-4-vit-tagger-v2')
-                    
+                                    result = result[1]
+                                    print(f"Interrogator 1 output was {result[1]}")
+
                                     if cpuandgpuinterrogation:
                                         result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
+                                        print(f"Interrogator 2 output was {result2[1]}")
+                                        result2 = result2[1]
                                         result = result + result2
                             else:
                                 print("No GPU found.")
                                 result = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
+                                result = result[1]
 
                             if result is None:
                                 logger.info("nothing returned from interrogation")
                             else:
-                                print(f"  interrogator output was {result[1]}")
+                                print(f"  interrogator output was {result}")
                         except Exception as e:
                             logger.error(f"interrogation failed.  {e}")
                          
@@ -1280,7 +1285,7 @@ else:
                     #exit()
                     
                     if result is not None:
-                        keywords = result[1]   
+                        keywords = result   
 
                         if CheckForPersonsNameInTags == True:
                             test = ' '.join(keywords)
