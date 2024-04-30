@@ -2,9 +2,9 @@
 
 from pathlib import Path
 import os
-import exiftool
+import util_exiftool
 import platform
-from exiftool import ExifToolHelper
+from util_exiftool import ExifToolHelper
 import shlex
 
 def get_operating_system():
@@ -22,7 +22,7 @@ def get_script_path():
 
 
 def find_metadata_tag(filetoproc,tag):
-    with exiftool.ExifToolHelper() as et:
+    with util_exiftool.ExifToolHelper() as et:
         metadata = et.get_metadata(filetoproc)
         for d in metadata:
             for key, value in d.items():
@@ -57,7 +57,7 @@ def modify_metadata_tag(filetoproc,tag,operation='read',valuetoinsert=None,forma
     tagname = None
     tagvalues = None
     found = False
-    with exiftool.ExifToolHelper() as et:
+    with util_exiftool.ExifToolHelper() as et:
         metadata = et.get_metadata(filetoproc)
         for d in metadata:
             for key, value in d.items():
@@ -74,7 +74,7 @@ def modify_metadata_tag(filetoproc,tag,operation='read',valuetoinsert=None,forma
         tagname = tag
     if operation == "delete":
         print(f"delete tag {tagname}")
-        with exiftool.ExifToolHelper(common_args=['-G', '-n', '-api', 'largefilesupport=1','-overwrite_original','-P','-m','-sep',';']) as et:
+        with util_exiftool.ExifToolHelper(common_args=['-G', '-n', '-api', 'largefilesupport=1','-overwrite_original','-P','-m','-sep',';']) as et:
             res = et.execute(f"-{tagname}=", filetoproc)
     elif operation == "set":
         print(f"set tag {tagname} to {valuetoinsert}")
@@ -82,7 +82,7 @@ def modify_metadata_tag(filetoproc,tag,operation='read',valuetoinsert=None,forma
             if valuetoinsert == tagvalues:
                 print("Already correct")
                 return True
-            with exiftool.ExifToolHelper(common_args=['-G', '-n', '-api', 'largefilesupport=1','-overwrite_original','-P','-m','-sep',';']) as et:
+            with util_exiftool.ExifToolHelper(common_args=['-G', '-n', '-api', 'largefilesupport=1','-overwrite_original','-P','-m','-sep',';']) as et:
                 res = et.execute(f"-{tagname}={valuetoinsert}", filetoproc)
     elif operation == "add":
         if found == True:
@@ -90,11 +90,11 @@ def modify_metadata_tag(filetoproc,tag,operation='read',valuetoinsert=None,forma
                     print(f"Tag {valuetoinsert} already exists in {tagname}.  Values are {tagvalues}")
                     return True
                 print(f"add value {valuetoinsert} to {tagname}")
-                with exiftool.ExifToolHelper(common_args=['-G', '-n', '-api', 'largefilesupport=1','-overwrite_original','-P','-m','-sep',';']) as et:
+                with util_exiftool.ExifToolHelper(common_args=['-G', '-n', '-api', 'largefilesupport=1','-overwrite_original','-P','-m','-sep',';']) as et:
                     res = et.execute(f"-{tagname}+={valuetoinsert}", filetoproc)
         else:
             print(f"add value {valuetoinsert} to {tagname}")
-            with exiftool.ExifToolHelper(common_args=['-G', '-n', '-api', 'largefilesupport=1','-overwrite_original','-P','-m','-sep',';']) as et:
+            with util_exiftool.ExifToolHelper(common_args=['-G', '-n', '-api', 'largefilesupport=1','-overwrite_original','-P','-m','-sep',';']) as et:
 
                 try:
                     res = et.execute(f"-{tagname}+={valuetoinsert}", filetoproc)
@@ -263,7 +263,7 @@ def get_description_keywords_tag(filetoproc):
  
 
 def read_all_metadata(filetoproc):
-    with exiftool.ExifToolHelper() as et:
+    with util_exiftool.ExifToolHelper() as et:
         metadata = et.get_metadata(filetoproc)
         for d in metadata:
             for key, value in d.items():

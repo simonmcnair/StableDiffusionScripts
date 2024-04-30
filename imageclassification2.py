@@ -1,6 +1,8 @@
 __author__='Simon McNair'
 
 import os,subprocess
+import util_exiftool
+import utils
 
 install_requirements = False
 def setup():
@@ -41,8 +43,6 @@ if install_requirements:
 #pip install tensorflow
 #sudo apt-get install python3-tk
 
-import utils
-import time
 import torch
 import pandas as pd
 import cv2
@@ -50,20 +50,19 @@ import numpy as np
 from typing import Mapping, Tuple, Dict
 from huggingface_hub import hf_hub_download
 from onnxruntime import InferenceSession
-from exiftool import ExifToolHelper
 #importing libraries
 import re
 #import glob
 from PIL.ExifTags import TAGS
 from PIL import Image, ImageTk
 #below for pngs
-from PIL import PngImagePlugin, Image
 #pip install piexif
 #import piexif
+from PIL import PngImagePlugin, Image
+
 #import piexif.helper
 import clip_interrogator
 from clip_interrogator import Config, Interrogator, list_clip_models
-import platform
 from transformers import BlipProcessor, BlipForConditionalGeneration
 import re
 #import threading
@@ -85,34 +84,7 @@ def check_gpu_present():
         # nvidia-smi command not found, so no GPU present
         return False
 
-def timing_decorator(func):
-    global timing_debug
-
-    def wrapper(*args, **kwargs):
-        if timing_debug == False:
-            return
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        logger.info(f"Function '{func.__name__}' took {end_time - start_time} seconds to execute.")
-        return result
-    return wrapper
-
-def get_operating_system():
-    system = platform.system()
-    return system
-
-
-def get_script_name():
-    # Use os.path.basename to get the base name (script name) from the full path
-    #basename = os.path.basename(path)
-    return Path(__file__).stem
-    #return os.path.basename(__file__)
-
-def get_script_path():
-    return os.path.dirname(os.path.realpath(__file__))
-
-@timing_decorator
+@utils.timing_decorator
 def is_person(snippet):
     try:
         for sent in nltk.sent_tokenize(snippet):
@@ -129,7 +101,7 @@ def is_person(snippet):
     except Exception as e:
         logger.error(f"Error in isperson{e}")
 
-@timing_decorator
+@utils.timing_decorator
 def torch_gc():
     if torch.cuda.is_available():
         with torch.cuda.device('cuda'):
@@ -144,7 +116,7 @@ def torch_gc():
             #logger.info("mem after")
             #logger.info(torch.cuda.memory_summary(device=None, abbreviated=False))
 
-@timing_decorator
+@utils.timing_decorator
 def low_vram():
     if torch.cuda.is_available():
         vram_total_mb = torch.cuda.get_device_properties('cuda').total_memory / (1024**2)
@@ -155,13 +127,13 @@ def low_vram():
     if vram_total_mb <= '4': return False 
     return True
 
-@timing_decorator
+@utils.timing_decorator
 def return_vram():
     if torch.cuda.is_available():
         vram_total_mb = torch.cuda.get_device_properties('cuda').total_memory / (1024**2)
     return vram_total_mb
 
-@timing_decorator
+@utils.timing_decorator
 def ddb(imagefile):
 
     #os.environ["CUDA_VISIBLE_DEVICES"]=""
@@ -212,7 +184,7 @@ def ddb(imagefile):
     #plt.text(input_image.size[0]*1.05, input_image.size[1]*0.85, txt)
     return txt
 
-@timing_decorator
+@utils.timing_decorator
 def unumcloud(image):
 
     #unumcloud(image):
@@ -239,7 +211,7 @@ def unumcloud(image):
     prompt_len = inputs["input_ids"].shape[1]
     decoded_text = processor.batch_decode(output[:, prompt_len:])[0]
 
-@timing_decorator
+@utils.timing_decorator
 def prepend_string_to_filename(fullpath, prefix):
     # Split the full path into directory and filename
     directory, filename = os.path.split(fullpath)
@@ -252,7 +224,7 @@ def prepend_string_to_filename(fullpath, prefix):
 
     return new_fullpath
 
-@timing_decorator
+@utils.timing_decorator
 def nlpconnect(fileinput):
     #nlpconnect
     from transformers import pipeline
@@ -260,7 +232,7 @@ def nlpconnect(fileinput):
     image_to_text = pipeline("image-to-text", model="nlpconnect/vit-gpt2-image-captioning")
     return image_to_text(fileinput)
 
-@timing_decorator
+@utils.timing_decorator
 def blip2_opt_2_7b(inputfile):
     #blip2_opt_2_7b
     import torch
@@ -298,7 +270,7 @@ def blip2_opt_2_7b(inputfile):
     logger.info(processor.decode(out[0], skip_special_tokens=True).strip())
     return out[0]
 
-@timing_decorator
+@utils.timing_decorator
 def get_description_keywords_tag(filetoproc, istagged=False):
     res = {}
     taglist =[]
@@ -315,7 +287,8 @@ def get_description_keywords_tag(filetoproc, istagged=False):
     if istagged:
         taglist.append('XMP:tagged')
     try:
-            for d in et.get_tags(files=filetoproc, tags=taglist):
+            read_tags = util_exiftool.readtags(filetoproc, taglist)
+            for d in read_tags:
                 for k, v in d.items():
                     #logger.info(f"Dict: {k} = {v}")
                     if k != 'SourceFile' and k != 'XMP:Tagged':
@@ -350,7 +323,7 @@ def get_description_keywords_tag(filetoproc, istagged=False):
     else:
         return res
 
-@timing_decorator
+@utils.timing_decorator
 def fix_person_tag(inputvar):
     try:
         if 'person' in str(inputvar.lower()) and 'people' not in str(inputvar.lower()):
@@ -382,7 +355,7 @@ def fix_person_tag(inputvar):
     except Exception as e:
         logger.error(f"fix_person_tag {e}")
 
-@timing_decorator
+@utils.timing_decorator
 def tidy_tags(lst):
     #return [item.replace("'", "").replace('"', "").replace("{", "").replace("}", "") for item in lst]
 
@@ -392,7 +365,7 @@ def tidy_tags(lst):
     else:
         return False
     
-@timing_decorator
+@utils.timing_decorator
 def filter_person_from_list(lst):
     personname = None
     peoplename = None
@@ -449,7 +422,7 @@ def symmetric_difference_update(set1, set2):
     return set1
 
 
-@timing_decorator
+@utils.timing_decorator
 def has_duplicates(lst):
     try:
         seen = set()
@@ -469,7 +442,8 @@ def has_duplicates(lst):
     except Exception as e:
         logger.error(f"has_duplicates error : {e}")
 
-@timing_decorator
+@utils.log_function_call
+@utils.timing_decorator
 def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed=False,dedupe=False):
     res = {}
     taglist =[  #"IFD0:XPKeywords",#list
@@ -538,9 +512,8 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         process[each] = 0
     
     try:
-        test2 =  et.get_metadata(files=filetoproc)
-        exiftaglist =  et.get_tags(files=filetoproc, tags=taglist,params=["-a","-g1","-s"])
-        logger.info(f"{et.last_stdout}")
+        test2 =  util_exiftool.get_metadata(filetoproc)
+        exiftaglist =  util_exiftool.exiftool_get_tags(filetoproc, taglist)
         test = exiftaglist[0]
         #logger.info(f"get_tags output: {et.last_stdout}")
     except Exception as e:
@@ -704,15 +677,12 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
         if markasprocessed:
             res['XMP:tagged'] = "true"
         try:
-            et.execute(*["-m","-P","-all=","-tagsfromfile","@","-all", "-overwrite_original", filetoproc])
+            util_exiftool.rewrite_image_file(filetoproc)
 #            et.set_tags(filetoproc, tags=res,params=["-v5","-m","-P", "-overwrite_original"])
             #et.execute(*["-m","-P", "-overwrite_original","-ifd0-= -iptc-= -exif-=", filetoproc])
 
-            et.set_tags(filetoproc, tags=res,params=["-m","-P", "-overwrite_original"])
+            util_exiftool.set_tags(filetoproc, res)
             #exiftool -ifd0:imagedescription= 
-            logger.info(f"{et.last_stdout}")
-            if '1 image files updated' not in et.last_stdout:
-                logger.error(f"Error !!! {filetoproc}. {res} {et.last_stdout}")
         except Exception as e:
             logger.error(f"Error set_tags {e}")
     elif (markasprocessed and tagged):
@@ -729,7 +699,7 @@ def apply_description_keywords_tag(filetoproc,valuetoinsert=None,markasprocessed
     return True
 
 
-@timing_decorator
+@utils.timing_decorator
 def blip_large(imagepath,model='small'):
 
     if model == 'small':
@@ -757,7 +727,7 @@ def blip_large(imagepath,model='small'):
     return res
 
 
-@timing_decorator
+@utils.timing_decorator
 def write_pnginfo(filename,tags):
     try:
         if os.path.exists(filename):
@@ -797,7 +767,7 @@ def write_pnginfo(filename,tags):
     except Exception as e:
         logger.error(f"write_pnginfo: Error {e}")
 
-@timing_decorator
+@utils.timing_decorator
 def search_replace_case_insensitive(search_pattern, replace_text, input_string):
     # Perform case-insensitive search
     matches = re.finditer(search_pattern, input_string, flags=re.IGNORECASE)
@@ -809,319 +779,8 @@ def search_replace_case_insensitive(search_pattern, replace_text, input_string):
 
     return result       
 
-@timing_decorator
-def modify_exif_comment(filename, tags, command, new_value=None, tagname= None):
-    # Check if the file exists
-    tags_list = []
-    does_image_have_tags = False
-    if os.path.exists(filename):
-        # Open the image
 
-        original_mtime = os.path.getmtime(filename)
-        original_atime = os.path.getatime(filename)
-
-        image = Image.open(filename)
-
-        # Get the Exif data
-        exifdata = image.getexif()
-
-        # Convert single tag to a list
-        if isinstance(tags, str):
-            tags = [tags]
-
-        if exifdata == None:
-            logger.info("No exifdata")
-            found = False
-        else:
-            # Use a custom tag (you can modify this based on your requirements)
-            found = False
-            if tagname is not None:
-                    for pil_tag, pil_tag_name in TAGS.items():
-                        if pil_tag_name == tagname:
-                            #custom_tag = hex(pil_tag_name)
-                            custom_tag = pil_tag
-                            logger.info(f"using {pil_tag} for {tagname} tag")
-                            found = True
-                            break
-        if found == False or tagname == None:
-            # 40094:0x9C9E:'XPKeywords'
-            logger.info("No exifdata or tagname = None.  Using XPKeywords for tag")
-            #custom_tag = 0x9C9E
-            custom_tag = 40094
-
-        # Check if the custom tag is present in the Exif data
-        if custom_tag not in exifdata:
-            # Custom tag doesn't exist, add it with an initial value
-            
-            exifdata[custom_tag] = ''.encode('utf-16le')
-            #exifdata[custom_tag] = ''.encode('utf-16')
-            logger.info("image doesn't currently have any tags")
-            current_tags = []
-        else:
-            does_image_have_tags = True
-            logger.info("image currently has tags")
-
-            # Decode the current tags string and remove null characters
-            current_tags = exifdata[custom_tag].decode('utf-16le').replace('\x00', '').replace(', ',',').replace(' ,',',')
-            #current_tags = exifdata[custom_tag].decode('utf-16').replace('\x00', '').replace(', ',',').replace(' ,',',')
-
-            # Split the tags into a list
-            current_tags = [current_tags.strip() for current_tags in re.split(r'[;,]', current_tags)]
-            #tags_list = list(set(tag.strip() for tag in re.split(r'[;,]', tags_string_concat)))
-            #tags_list = tags_string_concat.split(',')
-
-            #remove any dupes
-            current_tags = list(set(current_tags))
-            #remove any empty values
-            current_tags = {value for value in current_tags if value}
-
-            if len(current_tags) == 0:
-                logger.info("current_tags is there, but has no tags in")
-
-        if command == 'add':
-            # Add the tags if not present
-            if does_image_have_tags:
-                tags_to_add = set(tags) - set(current_tags)
-                tags_list.extend(tags_to_add)
-            else:
-                tags_list.extend(tags)
-
-        elif command == 'remove':
-            if does_image_have_tags:
-                tags_to_remove = set(tags) & set(current_tags)
-                tags_list = list(set(tags_list) - tags_to_remove)
-            else:
-                # If does_image_have_tags is False, you can decide if there's a specific removal logic
-                logger.info("does_image_have_tags is False, skipping removal.")
-
-        elif command == 'show':
-            # Return the list of tags or None if empty
-            logger.info(f"Exif tags {command}ed successfully.")
-            return tags_list if tags_list else None
-        elif command == 'update':
-            # Update an existing tag with a new value
-                if new_value is not None:
-                    if does_image_have_tags:
-                        tags_to_add = set(tags) - set(current_tags)
-                        tags_to_remove = set(current_tags) & set(tags)
-
-                        tags_set = (set(tags_list) - tags_to_remove) | tags_to_add
-                        tags_list = list(tags_set)
-                    else:
-                        # If does_image_have_tags is False, you can decide if there's a specific update logic
-                        logger.info("does_image_have_tags is False, skipping update.")                            
-                else:
-                    logger.info("Missing new_value for 'update' command.")
-                    return
-        elif command == 'clear':
-            # Clear all tags
-            tags_list = []
-        elif command == 'count':
-            # Get the count of tags
-            logger.info(f"Exif tags {command} completed successfully.")
-            if does_image_have_tags == True:
-                return len(tags_list)
-            else:
-                return 0
-        elif command == 'search':
-            # Check if a specific tag exists
-            if does_image_have_tags == True:
-                logger.info(f"Exif tags {command}ed successfully.")
-                return any(tag in current_tags for tag in tags)
-            else:
-                return ''
-        else:
-            logger.info("Invalid command. Please use 'add', 'remove', 'show', 'update', 'clear', 'count', or 'search'.")
-            return
-
-        # Check if the tags have changed
-        if does_image_have_tags == True:
-            #remove dupes
-            new_tags_set = set(tags_list)
-            #remove empty/null
-            new_tags_set = {value for value in new_tags_set if value}
-
-        if does_image_have_tags == False or len(tags_list) > 0:
-            if does_image_have_tags == False:
-                logger.info(f"no tags originally.  Need to add tags {str(list(tags_list))}.")
-            else:
-                logger.info(f"need to add tags {str(list(tags_list))}.  Current tags are {str(list(current_tags))}")
-
-        #if updated_tags_string != tags_string_concat:
-            # Encode the modified tags string and update the Exif data
-            # Join the modified tags list into a string
-            updated_tags_string = ';'.join(tags_list)
-
-            #exifdata[custom_tag] = updated_tags_string.encode('utf-16')
-            exifdata[custom_tag] = updated_tags_string.encode('utf-16le')
-
-            # Save the image with updated Exif data
-            image.save(filename, exif=exifdata)
-            logger.info(f"Exif tags {command}ed successfully to {filename}.")
-            os.utime(filename, (original_atime, original_mtime))
-            logger.info(f"atime and mtime restored.")
-        else:
-            logger.info(f"No changes in tags for file {filename}. File not updated.")
-    else:
-        logger.info(f"File not found: {filename}")
-
-@timing_decorator
-def modify_exif_tags(filename, tags, command, new_value=None, tagname= None):
-    # Check if the file exists
-    tags_list = []
-    does_image_have_tags = False
-    if os.path.exists(filename):
-        # Open the image
-
-        original_mtime = os.path.getmtime(filename)
-        original_atime = os.path.getatime(filename)
-
-        image = Image.open(filename)
-
-        # Get the Exif data
-        exifdata = image.getexif()
-
-        # Convert single tag to a list
-        if isinstance(tags, str):
-            tags = [tags]
-
-        if exifdata == None:
-            logger.info("No exifdata")
-            found = False
-        else:
-            # Use a custom tag (you can modify this based on your requirements)
-            found = False
-            if tagname is not None:
-                    for pil_tag, pil_tag_name in TAGS.items():
-                        if pil_tag_name == tagname:
-                            #custom_tag = hex(pil_tag_name)
-                            custom_tag = pil_tag
-                            logger.info(f"using {pil_tag} for {tagname} tag")
-                            found = True
-                            break
-        if found == False or tagname == None:
-            # 40094:0x9C9E:'XPKeywords'
-            logger.info("No exifdata or tagname = None.  Using XPKeywords for tag")
-            #custom_tag = 0x9C9E
-            custom_tag = 40094
-
-        # Check if the custom tag is present in the Exif data
-        if custom_tag not in exifdata:
-            # Custom tag doesn't exist, add it with an initial value
-            
-            exifdata[custom_tag] = ''.encode('utf-16le')
-            #exifdata[custom_tag] = ''.encode('utf-16')
-            logger.info("image doesn't currently have any tags")
-            current_tags = []
-        else:
-            does_image_have_tags = True
-            logger.info("image currently has tags")
-
-            # Decode the current tags string and remove null characters
-            current_tags = exifdata[custom_tag].decode('utf-16le').replace('\x00', '').replace(', ',',').replace(' ,',',')
-            #current_tags = exifdata[custom_tag].decode('utf-16').replace('\x00', '').replace(', ',',').replace(' ,',',')
-
-            # Split the tags into a list
-            current_tags = [current_tags.strip() for current_tags in re.split(r'[;,]', current_tags)]
-            #tags_list = list(set(tag.strip() for tag in re.split(r'[;,]', tags_string_concat)))
-            #tags_list = tags_string_concat.split(',')
-
-            #remove any dupes
-            current_tags = list(set(current_tags))
-            #remove any empty values
-            current_tags = {value for value in current_tags if value}
-
-            if len(current_tags) == 0:
-                logger.info("current_tags is there, but has no tags in")
-
-        if command == 'add':
-            # Add the tags if not present
-            if does_image_have_tags:
-                tags_to_add = set(tags) - set(current_tags)
-                tags_list.extend(tags_to_add)
-            else:
-                tags_list.extend(tags)
-
-        elif command == 'remove':
-            if does_image_have_tags:
-                tags_to_remove = set(tags) & set(current_tags)
-                tags_list = list(set(tags_list) - tags_to_remove)
-            else:
-                # If does_image_have_tags is False, you can decide if there's a specific removal logic
-                logger.info("does_image_have_tags is False, skipping removal.")
-
-        elif command == 'show':
-            # Return the list of tags or None if empty
-            logger.info(f"Exif tags {command}ed successfully.")
-            return tags_list if tags_list else None
-        elif command == 'update':
-            # Update an existing tag with a new value
-                if new_value is not None:
-                    if does_image_have_tags:
-                        tags_to_add = set(tags) - set(current_tags)
-                        tags_to_remove = set(current_tags) & set(tags)
-
-                        tags_set = (set(tags_list) - tags_to_remove) | tags_to_add
-                        tags_list = list(tags_set)
-                    else:
-                        # If does_image_have_tags is False, you can decide if there's a specific update logic
-                        logger.info("does_image_have_tags is False, skipping update.")                            
-                else:
-                    logger.info("Missing new_value for 'update' command.")
-                    return
-        elif command == 'clear':
-            # Clear all tags
-            tags_list = []
-        elif command == 'count':
-            # Get the count of tags
-            logger.info(f"Exif tags {command} completed successfully.")
-            if does_image_have_tags == True:
-                return len(tags_list)
-            else:
-                return 0
-        elif command == 'search':
-            # Check if a specific tag exists
-            if does_image_have_tags == True:
-                logger.info(f"Exif tags {command}ed successfully.")
-                return any(tag in current_tags for tag in tags)
-            else:
-                return ''
-        else:
-            logger.info("Invalid command. Please use 'add', 'remove', 'show', 'update', 'clear', 'count', or 'search'.")
-            return
-
-        # Check if the tags have changed
-        if does_image_have_tags == True:
-            #remove dupes
-            new_tags_set = set(tags_list)
-            #remove empty/null
-            new_tags_set = {value for value in new_tags_set if value}
-
-        if does_image_have_tags == False or len(tags_list) > 0:
-            if does_image_have_tags == False:
-                logger.info(f"no tags originally.  Need to add tags {str(list(tags_list))}.")
-            else:
-                logger.info(f"need to add tags {str(list(tags_list))}.  Current tags are {str(list(current_tags))}")
-
-        #if updated_tags_string != tags_string_concat:
-            # Encode the modified tags string and update the Exif data
-            # Join the modified tags list into a string
-            updated_tags_string = ';'.join(tags_list)
-
-            #exifdata[custom_tag] = updated_tags_string.encode('utf-16')
-            exifdata[custom_tag] = updated_tags_string.encode('utf-16le')
-
-            # Save the image with updated Exif data
-            image.save(filename, exif=exifdata)
-            logger.info(f"Exif tags {command}ed successfully to {filename}.")
-            os.utime(filename, (original_atime, original_mtime))
-            logger.info(f"atime and mtime restored.")
-        else:
-            logger.info(f"No changes in tags for file {filename}. File not updated.")
-    else:
-        logger.info(f"File not found: {filename}")
-
-@timing_decorator
+@utils.timing_decorator
 def load_image_in_thread(image_path):
 
     try:
@@ -1133,7 +792,7 @@ def load_image_in_thread(image_path):
 
     return ImageTk.PhotoImage(image1)
 
-@timing_decorator
+@utils.timing_decorator
 def image_make_square(img, target_size):
     old_size = img.shape[:2]
     desired_size = max(old_size)
@@ -1147,7 +806,7 @@ def image_make_square(img, target_size):
     color = [255, 255, 255]
     return cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
 
-@timing_decorator
+@utils.timing_decorator
 def image_smart_resize(img, size):
     # Assumes the image has already gone through image_make_square
     if img.shape[0] > size:
@@ -1242,7 +901,7 @@ CLIPInterrogatorModels: Mapping[str, CLIPInterrogator] = {
     'wd-v1-4-vit-tagger-v2': CLIPInterrogator(repo='SmilingWolf/wd-v1-4-vit-tagger-v2')
 }
 
-@timing_decorator
+@utils.timing_decorator
 def image_to_wd14_tags(filename,modeltouse='wd14-vit-v2') \
         -> Tuple[Mapping[str, float], str, Mapping[str, float]]:
     
@@ -1351,7 +1010,7 @@ class ImageTextDisplay:
             logger.info("hi")
             logger.info(image_path)
             logger.info(str(test))
-            modify_exif_tags(image_path, test, 'add')
+            util_exiftool.modify_exif_tags(image_path, test, 'add')
 
     def auto_play(self):
         self.auto = True
@@ -1455,13 +1114,13 @@ custom_tag = None
 cpuandgpuinterrogation = False
 defaultdir = '/folder/to/process'
 
-current_os = get_operating_system()
+current_os = utils.get_operating_system()
 
-localoverridesfile = os.path.join(get_script_path(), "localoverridesfile_" + get_script_name() + '_' + current_os + '.py')
-log_file_path =  os.path.join(get_script_path(),get_script_name() + '.log')
-errorlog_file_path =  os.path.join(get_script_path(),get_script_name() + '_error.log')
+localoverridesfile = os.path.join(utils.get_script_path(__file__), "localoverridesfile_" + utils.get_script_name(__file__) + '_' + current_os + '.py')
 
-logger = utils.setup_logging(log_file_path, errorlog_file_path, log_level='info')
+logfilepath = os.path.join(utils.get_script_path(__file__),utils.get_script_name(__file__) + '.log')
+errorlogfilepath = os.path.join(utils.get_script_path(__file__),utils.get_script_name(__file__) + '_error.log')
+logger = utils.get_logger(logfilepath, errorlogfilepath)
 
 if current_os == "Windows":
     logger.info("Running on Windows")
@@ -1509,12 +1168,11 @@ if CheckForPersonsNameInTags:
     ##cp stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.crf.ser.gz stanford-ner/english.all.3class.distsim.crf.ser.gz
     ##cp stanford-ner-2014-08-27/classifiers/english.all.3class.distsim.prop stanford-ner/english.all.3class.distsim.prop
     ##rm -rf stanford-ner-2014-08-27 stanford-ner-2014-08-27.zip
-    st = StanfordNERTagger (get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', get_script_path() + '/stanford-ner/stanford-ner.jar')
+    st = StanfordNERTagger (utils.get_script_path() + '/stanford-ner/english.all.3class.distsim.crf.ser.gz', utils.get_script_path() + '/stanford-ner/stanford-ner.jar')
 
 #ci = None
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,expandable_segments:True"
 
-et = ExifToolHelper(logger=logger,common_args=['-G', '-n','-a','-P',"-overwrite_original",'-m'])
 # Start ExifTool process
 
 model_loaded = False
@@ -1531,18 +1189,18 @@ if gui == True:
 
 else:
     modelarray = {
-                'ViT-L-14': 'ViT-L-14/openai',
-                'ViT-L-14': 'immich-app/ViT-L-14__openai',
-                'ViT-H-14': 'ViT-H-14/laion2b_s32b_b79',
-                'ViT-H-14': 'laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
-                'wd14': 'wd14-convnext',
-                'wd14': 'saltacc/wd-1-4-anime',
+                #'ViT-L-14': 'ViT-L-14/openai',
+                #'ViT-L-14': 'immich-app/ViT-L-14__openai',
+                #'ViT-H-14': 'ViT-H-14/laion2b_s32b_b79',
+                #'ViT-H-14': 'laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
+                #'wd14': 'wd14-convnext',
+                #'wd14': 'saltacc/wd-1-4-anime',
                 'wd' : 'SmilingWolf/wd-v1-4-vit-tagger-v2',
-                'blip-base': 'Salesforce/blip-image-captioning-base',   # 990MB
-                'blip-large': 'Salesforce/blip-image-captioning-large', # 1.9GB
-                'blip2-2.7b': 'Salesforce/blip2-opt-2.7b',              # 15.5GB
-                'blip2-flan-t5-xl': 'Salesforce/blip2-flan-t5-xl',      # 15.77GB
-                'git-large-coco': 'microsoft/git-large-coco'           # 1.58GB
+                #'blip-base': 'Salesforce/blip-image-captioning-base',   # 990MB
+                #'blip-large': 'Salesforce/blip-image-captioning-large', # 1.9GB
+                #'blip2-2.7b': 'Salesforce/blip2-opt-2.7b',              # 15.5GB
+                #'blip2-flan-t5-xl': 'Salesforce/blip2-flan-t5-xl',      # 15.77GB
+                #'git-large-coco': 'microsoft/git-large-coco'           # 1.58GB
                 }
 
     for root, dirs, files in os.walk(defaultdir):
@@ -1563,21 +1221,6 @@ else:
                     logger.info(f"{fullpath} - Not tagged continuing")
                     result = None
                 
-                    for each,desc in modelarray.items():
-                        logger.info("using: " + each)
-                        model_path = hf_hub_download(desc, filename='model.onnx')
-                        tags_path = hf_hub_download(desc, filename='selected_tags.csv')
-        
-                        processor = BlipProcessor.from_pretrained(desc)
-                        model = BlipForConditionalGeneration.from_pretrained(desc)
-                        image = Image.open(fullpath).convert('RGB')
-                        inputs = processor(image, return_tensors="pt")
-                        out = model.generate(**inputs)
-                        logger.info(f"{fullpath}. {each} {processor.decode(out[0], skip_special_tokens=True)}")
-                        logger.info("press a key to continue")
-                        input()
-                    break
-
                     #result = ddb(fullpath)
 
                     #result = image_to_wd14_tags(fullpath,'wd14-vit-v2')
@@ -1606,8 +1249,8 @@ else:
                                     
                                     #result = (ci.interrogate(image))
                                     #print(result)
-                                    input()
-
+                                    result = image_to_wd14_tags(fullpath,'wd-v1-4-vit-tagger-v2')
+                    
                                     if cpuandgpuinterrogation:
                                         result2 = image_to_wd14_tags(fullpath,'wd-v1-4-convnextv2-tagger-v2')
                                         result = result + result2
@@ -1670,4 +1313,4 @@ else:
             else:
                 logger.info(f"{fullpath} - Unsupported filetype.  Not an image.")
 
-et.terminate()
+
