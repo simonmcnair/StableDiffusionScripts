@@ -35,12 +35,12 @@ PyYAML==6.0.1
 regex==2023.12.25
 requests==2.31.0
 safetensors==0.4.2
-sentencepiece==0.2.0
+sentencepiece==0.2.1
 six==1.16.0
 sympy==1.12
 timm==0.9.16
 tokenizers==0.15.2
-torch==2.2.1
+torch==2.10.0
 torchvision==0.17.1
 tqdm==4.66.2
 transformers==4.39.1
